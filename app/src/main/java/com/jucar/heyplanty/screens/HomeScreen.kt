@@ -1,10 +1,12 @@
 package com.jucar.heyplanty.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -50,23 +52,40 @@ fun HomeScreen(viewModel: PlantaViewModel = viewModel()) {
     ) { padding ->
         Box(modifier = Modifier.padding(padding)) {
             LazyColumn(modifier = Modifier.fillMaxSize()) {
-                items(misPlantas) { planta ->
-                    PlantItem(
-                        planta = planta,
-                        // AQUÍ ESTABA EL ERROR: Ahora planta.id (String) coincide con regarPlanta(String)
-                        onRegarClick = { viewModel.regarPlanta(planta.id) }
+                items(items = misPlantas, key = { it.id }) { planta ->
+                    val dismissState = rememberSwipeToDismissBoxState(
+                        confirmValueChange = { value ->
+                            if (value == SwipeToDismissBoxValue.EndToStart) {
+                                viewModel.eliminarPlanta(planta.id)
+                                true
+                            } else false
+                        }
                     )
+
+                    SwipeToDismissBox(
+                        state = dismissState,
+                        enableDismissFromStartToEnd = false,
+                        backgroundContent = {
+                            val color = if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart)
+                                Color.Red.copy(alpha = 0.7f) else Color.Transparent
+                            Box(
+                                modifier = Modifier.fillMaxSize().padding(8.dp).background(color, MaterialTheme.shapes.medium),
+                                contentAlignment = Alignment.CenterEnd
+                            ) {
+                                Icon(Icons.Default.Delete, contentDescription = "Borrar", tint = Color.White, modifier = Modifier.padding(end = 16.dp))
+                            }
+                        }
+                    ) {
+                        PlantItem(
+                            planta = planta,
+                            onRegarClick = { viewModel.regarPlanta(planta.id) }
+                        )
+                    }
                 }
             }
 
             if (showDialog) {
-                AddPlantDialog(
-                    onDismiss = { showDialog = false },
-                    onPlantAdded = { nombre, dias ->
-                        viewModel.agregarPlanta(nombre, dias)
-                        showDialog = false
-                    }
-                )
+                AddPlantDialog(onDismiss = { showDialog = false }, onPlantAdded = { n, d -> viewModel.agregarPlanta(n, d); showDialog = false })
             }
         }
     }
@@ -74,11 +93,27 @@ fun HomeScreen(viewModel: PlantaViewModel = viewModel()) {
 
 @Composable
 fun PlantItem(planta: Planta, onRegarClick: () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
+    // DETERMINAR COLORES SEGÚN LA SED
+    val colorFondo = if (planta.tieneSed()) Color(0xFFFFEBEE) else MaterialTheme.colorScheme.surfaceVariant
+    val colorBorde = if (planta.tieneSed()) Color(0xFFFFCDD2) else Color.Transparent
+
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(8.dp),
+        colors = CardDefaults.cardColors(containerColor = colorFondo),
+        border = if (planta.tieneSed()) androidx.compose.foundation.BorderStroke(1.dp, colorBorde) else null
+    ) {
         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = planta.nombre, style = MaterialTheme.typography.titleLarge)
-                Text(text = "Riego: cada ${planta.diasEntreRiegos} días")
+                Text(
+                    text = if (planta.tieneSed()) "${planta.nombre} 😫" else planta.nombre,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = if (planta.tieneSed()) Color(0xFFB71C1C) else Color.Unspecified
+                )
+                Text(
+                    text = if (planta.tieneSed()) "¡NECESITA AGUA!" else "Riego: cada ${planta.diasEntreRiegos} días",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (planta.tieneSed()) Color(0xFFD32F2F) else Color.Unspecified
+                )
             }
             IconButton(onClick = onRegarClick) {
                 Icon(imageVector = IconoGotaAgua, contentDescription = null, tint = Color.Unspecified)

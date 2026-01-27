@@ -12,9 +12,12 @@ interface PlantaDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPlanta(planta: Planta)
 
-    // SOLUCIÓN: plantaId DEBE ser String para que coincida con la clase Planta
     @Query("UPDATE plantas SET fechaUltimoRiego = :nuevaFecha WHERE id = :plantaId")
     suspend fun actualizarFechaRiego(plantaId: String, nuevaFecha: Long)
+
+    // Nueva función para el Swipe to Dismiss
+    @Query("DELETE FROM plantas WHERE id = :plantaId")
+    suspend fun borrarPlantaPorId(plantaId: String)
 
     @Delete
     suspend fun deletePlanta(planta: Planta)

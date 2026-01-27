@@ -25,10 +25,15 @@ class PlantaViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    // SOLUCIÓN: Recibimos plantaId como String
     fun regarPlanta(plantaId: String) {
         viewModelScope.launch {
             plantaDao.actualizarFechaRiego(plantaId, System.currentTimeMillis())
+        }
+    }
+
+    fun eliminarPlanta(plantaId: String) {
+        viewModelScope.launch {
+            plantaDao.borrarPlantaPorId(plantaId)
         }
     }
 }
