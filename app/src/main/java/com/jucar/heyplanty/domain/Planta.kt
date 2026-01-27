@@ -12,12 +12,14 @@ data class Planta(
     val especie: String,
     val diasEntreRiegos: Int,
     val fechaUltimoRiego: Long,
+    val imagenUri: String? = null, // NUEVO: Dirección de la foto
     val nivelDrama: Int = 3
 ) {
     fun tieneSed(): Boolean {
         val ahora = System.currentTimeMillis()
         val tiempoTranscurrido = ahora - fechaUltimoRiego
-        val intervaloMilis = diasEntreRiegos * 24 * 60 * 60 * 1000L
+        if (diasEntreRiegos == 0) return tiempoTranscurrido > 60000
+        val intervaloMilis = diasEntreRiegos * 60 * 60 * 1000L
         return tiempoTranscurrido >= intervaloMilis
     }
 }
