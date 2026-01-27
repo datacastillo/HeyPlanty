@@ -10,6 +10,9 @@ import android.os.Vibrator
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import androidx.work.workDataOf
 import com.jucar.heyplanty.data.AppDatabase
 import com.jucar.heyplanty.domain.Planta
 import kotlinx.coroutines.flow.Flow
@@ -18,6 +21,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
+import java.util.concurrent.TimeUnit
 
 class PlantaViewModel(application: Application) : AndroidViewModel(application) {
     private val plantaDao = AppDatabase.getDatabase(application).plantaDao()
@@ -25,37 +29,62 @@ class PlantaViewModel(application: Application) : AndroidViewModel(application) 
 
     private val _eventoRiego = MutableSharedFlow<String>()
     val eventoRiego = _eventoRiego.asSharedFlow()
-
     private var mediaPlayer: MediaPlayer? = null
 
-    // --- LÓGICA DE RIEGO ---
+    private fun programarNotificacion(plantaNombre: String, minutosTotales: Int) {
+        if (minutosTotales <= 0) return
+
+        val workRequest = OneTimeWorkRequestBuilder<NotifyWorker>()
+            .setInitialDelay(minutosTotales.toLong(), TimeUnit.MINUTES)
+            .setInputData(workDataOf("plant_name" to plantaNombre))
+            .addTag(plantaNombre)
+            .build()
+
+        WorkManager.getInstance(getApplication()).enqueue(workRequest)
+    }
+
     fun regarPlanta(planta: Planta) {
         viewModelScope.launch {
             ejecutarEfectosRiego()
+            WorkManager.getInstance(getApplication()).cancelAllWorkByTag(planta.nombre)
+            programarNotificacion(planta.nombre, planta.diasEntreRiegos)
             plantaDao.actualizarFechaRiego(planta.id, System.currentTimeMillis())
             _eventoRiego.emit("¡${planta.nombre} ha sido regada! 💧")
         }
     }
 
+    // AHORA RECIBE HORAS Y MINUTOS COMO INT
+    fun agregarPlanta(nombre: String, horas: Int, minutos: Int, uriString: String?) {
+        viewModelScope.launch {
+            val totalMinutos = (horas * 60) + minutos
+            val minutosFinales = if (totalMinutos <= 0) 1 else totalMinutos
+            val rutaFinal = uriString?.let { copiarImagenInterna(it) }
+
+            val nueva = Planta(
+                nombre = nombre,
+                especie = "Identificando...",
+                diasEntreRiegos = minutosFinales,
+                fechaUltimoRiego = System.currentTimeMillis(),
+                imagenUri = rutaFinal
+            )
+            plantaDao.insertPlanta(nueva)
+            programarNotificacion(nombre, minutosFinales)
+        }
+    }
+
     private fun ejecutarEfectosRiego() {
-        // 1. Vibración con soporte para versiones antiguas y nuevas
         try {
             val vibrator = getApplication<Application>().getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
             if (vibrator.hasVibrator()) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    // API 26+
                     vibrator.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
                 } else {
-                    // API < 26 (Deprecado pero necesario para soporte)
                     @Suppress("DEPRECATION")
                     vibrator.vibrate(50)
                 }
             }
-        } catch (e: Exception) {
-            Log.e("HeyPlanty", "Error vibración: ${e.message}")
-        }
+        } catch (e: Exception) { Log.e("HeyPlanty", "Error vibración: ${e.message}") }
 
-        // 2. Sonido
         try {
             mediaPlayer?.release()
             mediaPlayer = MediaPlayer.create(getApplication(), R.raw.regar_sonido)
@@ -64,26 +93,7 @@ class PlantaViewModel(application: Application) : AndroidViewModel(application) 
                 mp.setVolume(1.0f, 1.0f)
                 mp.start()
             }
-        } catch (e: Exception) {
-            Log.e("HeyPlanty", "Error al reproducir audio: ${e.message}")
-        }
-    }
-
-    // --- RESTO DE FUNCIONES ---
-    fun agregarPlanta(nombre: String, horasTexto: String, uriString: String?) {
-        viewModelScope.launch {
-            val horasInt = horasTexto.toIntOrNull() ?: 0
-            val rutaFinal = uriString?.let { copiarImagenInterna(it) }
-
-            val nueva = Planta(
-                nombre = nombre,
-                especie = "Identificando...",
-                diasEntreRiegos = horasInt,
-                fechaUltimoRiego = System.currentTimeMillis(),
-                imagenUri = rutaFinal
-            )
-            plantaDao.insertPlanta(nueva)
-        }
+        } catch (e: Exception) { Log.e("HeyPlanty", "Error audio: ${e.message}") }
     }
 
     private fun copiarImagenInterna(uriString: String): String? {
@@ -93,25 +103,15 @@ class PlantaViewModel(application: Application) : AndroidViewModel(application) 
             val inputStream = context.contentResolver.openInputStream(uri)
             val nombreArchivo = "planta_${System.currentTimeMillis()}.jpg"
             val archivoDestino = File(context.filesDir, nombreArchivo)
-
-            inputStream?.use { input ->
-                FileOutputStream(archivoDestino).use { output ->
-                    input.copyTo(output)
-                }
-            }
+            inputStream?.use { input -> FileOutputStream(archivoDestino).use { output -> input.copyTo(output) } }
             archivoDestino.absolutePath
-        } catch (e: Exception) {
-            e.printStackTrace()
-            null
-        }
+        } catch (e: Exception) { e.printStackTrace(); null }
     }
 
     fun eliminarPlanta(planta: Planta) {
         viewModelScope.launch {
-            planta.imagenUri?.let { ruta ->
-                val archivo = File(ruta)
-                if (archivo.exists()) archivo.delete()
-            }
+            WorkManager.getInstance(getApplication()).cancelAllWorkByTag(planta.nombre)
+            planta.imagenUri?.let { File(it).apply { if (exists()) delete() } }
             plantaDao.borrarPlantaPorId(planta.id)
         }
     }
@@ -119,6 +119,5 @@ class PlantaViewModel(application: Application) : AndroidViewModel(application) 
     override fun onCleared() {
         super.onCleared()
         mediaPlayer?.release()
-        mediaPlayer = null
     }
 }

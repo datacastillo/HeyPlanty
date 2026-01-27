@@ -1,7 +1,7 @@
 package com.jucar.heyplanty.screens
 
-import androidx.compose.animation.* // Importamos todo para las animaciones
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.layout.ContentScale
@@ -82,20 +83,7 @@ fun HomeScreen(viewModel: PlantaViewModel = viewModel()) {
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
-                    // --- ANIMACIÓN DE LA BARRA SUPERIOR ---
-                    AnimatedContent(
-                        targetState = isSearching,
-                        transitionSpec = {
-                            if (targetState) { // Si aparece el buscador
-                                (slideInVertically { height -> -height } + fadeIn()).togetherWith(
-                                    slideOutVertically { height -> height } + fadeOut())
-                            } else { // Si vuelve el título
-                                (slideInVertically { height -> height } + fadeIn()).togetherWith(
-                                    slideOutVertically { height -> -height } + fadeOut())
-                            }.using(SizeTransform(clip = false))
-                        },
-                        label = "AnimacionBuscador"
-                    ) { searching ->
+                    AnimatedContent(targetState = isSearching, label = "") { searching ->
                         if (!searching) {
                             Text("HeyPlanty 🌿", fontWeight = FontWeight.Bold)
                         } else {
@@ -107,9 +95,7 @@ fun HomeScreen(viewModel: PlantaViewModel = viewModel()) {
                                 singleLine = true,
                                 colors = TextFieldDefaults.colors(
                                     focusedContainerColor = Color.Transparent,
-                                    unfocusedContainerColor = Color.Transparent,
-                                    focusedIndicatorColor = Color.Transparent,
-                                    unfocusedIndicatorColor = Color.Transparent
+                                    unfocusedContainerColor = Color.Transparent
                                 )
                             )
                         }
@@ -120,39 +106,24 @@ fun HomeScreen(viewModel: PlantaViewModel = viewModel()) {
                         isSearching = !isSearching
                         if (!isSearching) searchText = ""
                     }) {
-                        Icon(
-                            imageVector = if (isSearching) Icons.Default.Close else Icons.Default.Search,
-                            contentDescription = "Buscar"
-                        )
+                        Icon(imageVector = if (isSearching) Icons.Default.Close else Icons.Default.Search, contentDescription = null)
                     }
                 }
             )
         },
         floatingActionButton = {
             FloatingActionButton(onClick = { showDialog = true }) {
-                Icon(Icons.Default.Add, contentDescription = "Nueva Planta")
+                Icon(Icons.Default.Add, contentDescription = null)
             }
         }
     ) { padding ->
         Box(modifier = Modifier.padding(padding)) {
-            if (plantasFiltradas.isEmpty()) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                        if (searchText.isEmpty()) "No tienes plantas aún. 🌱" else "No se encontró nada. 🔍",
-                        color = Color.Gray
-                    )
-                }
-            }
-
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(
-                    items = plantasFiltradas,
-                    key = { it.id }
-                ) { planta ->
+                items(items = plantasFiltradas, key = { it.id }) { planta ->
                     val dismissState = rememberSwipeToDismissBoxState(
                         confirmValueChange = { value ->
                             if (value == SwipeToDismissBoxValue.EndToStart) {
@@ -167,10 +138,7 @@ fun HomeScreen(viewModel: PlantaViewModel = viewModel()) {
                         enableDismissFromStartToEnd = false,
                         backgroundContent = {
                             Box(
-                                Modifier
-                                    .fillMaxSize()
-                                    .padding(vertical = 4.dp)
-                                    .background(Color(0xFFE57373), MaterialTheme.shapes.large),
+                                Modifier.fillMaxSize().background(Color(0xFFE57373), MaterialTheme.shapes.large),
                                 contentAlignment = Alignment.CenterEnd
                             ) {
                                 Icon(Icons.Default.Delete, null, tint = Color.White, modifier = Modifier.padding(end = 20.dp))
@@ -183,27 +151,43 @@ fun HomeScreen(viewModel: PlantaViewModel = viewModel()) {
             }
 
             if (showDialog) {
-                AddPlantDialog(onDismiss = { showDialog = false }, onPlantAdded = { n, h, u ->
-                    viewModel.agregarPlanta(n, h, u)
-                    showDialog = false
-                })
+                AddPlantDialog(
+                    onDismiss = { showDialog = false },
+                    onPlantAdded = { nombre, horas, minutos, uri ->
+                        viewModel.agregarPlanta(nombre, horas, minutos, uri)
+                        showDialog = false
+                    }
+                )
             }
         }
     }
 }
 
-// PlantItem se mantiene igual que antes (ya lo tienes funcionando de maravilla)
 @Composable
 fun PlantItem(planta: Planta, tiempoActual: Long, onRegarClick: () -> Unit) {
-    val tieneSed = planta.tieneSed()
     val progresoRiego = planta.obtenerProgresoRiego()
-    val proximoRiego = planta.fechaUltimoRiego + (planta.diasEntreRiegos * 60 * 60 * 1000L)
+    val proximoRiego = planta.fechaUltimoRiego + (planta.diasEntreRiegos * 60 * 1000L)
     val milisRestantes = proximoRiego - tiempoActual
-    val minutosRestantes = TimeUnit.MILLISECONDS.toMinutes(milisRestantes)
+
+    // --- Lógica de Alerta Visual ---
+    val esCritico = progresoRiego < 0.2f
+
+    // Animación de parpadeo suave
+    val infiniteTransition = rememberInfiniteTransition(label = "parpadeo")
+    val alphaAnimado by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = if (esCritico) 0.4f else 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "transparencia"
+    )
 
     val mensajeTiempo = if (milisRestantes < 0) {
-        val h = TimeUnit.MILLISECONDS.toHours(Math.abs(milisRestantes))
-        if (h == 0L) "¡Toca regar ahora!" else "Retraso de $h h"
+        val minAtraso = TimeUnit.MILLISECONDS.toMinutes(Math.abs(milisRestantes))
+        if (minAtraso < 60) "Retraso de $minAtraso min"
+        else "Retraso de ${minAtraso/60} h"
     } else {
         val h = TimeUnit.MILLISECONDS.toHours(milisRestantes)
         val m = TimeUnit.MILLISECONDS.toMinutes(milisRestantes) % 60
@@ -212,22 +196,22 @@ fun PlantItem(planta: Planta, tiempoActual: Long, onRegarClick: () -> Unit) {
     }
 
     val colorAlerta = when {
-        tieneSed -> Color(0xFFB71C1C)
-        minutosRestantes < 10 -> Color(0xFFF44336)
-        minutosRestantes < 30 -> Color(0xFFFF9800)
-        minutosRestantes < 45 -> Color(0xFFFFEB3B)
-        else -> Color(0xFF4CAF50)
+        progresoRiego > 0.6f -> Color(0xFF4CAF50) // Verde
+        progresoRiego > 0.3f -> Color(0xFFFF9800) // Naranja
+        else -> Color(0xFFB71C1C) // Rojo
     }
 
-    val colorFondoCard = if (tieneSed || minutosRestantes < 10) Color(0xFFFFEBEE) else Color(0xFFF1F8E9)
-    val colorTextoPrincipal = if (tieneSed || minutosRestantes < 10) Color(0xFFB71C1C) else Color(0xFF2E7D32)
+    val colorFondoCard = if (esCritico) Color(0xFFFFEBEE) else Color(0xFFF1F8E9)
+    val colorTextoPrincipal = if (esCritico) Color(0xFFB71C1C) else Color(0xFF2E7D32)
     val colorAnimado by animateColorAsState(targetValue = colorFondoCard, animationSpec = tween(500), label = "")
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer(alpha = alphaAnimado), // Aplicar parpadeo
         colors = CardDefaults.cardColors(containerColor = colorAnimado),
         shape = MaterialTheme.shapes.large,
-        elevation = CardDefaults.cardElevation(2.dp)
+        elevation = CardDefaults.cardElevation(if (esCritico) 6.dp else 2.dp) // Resalta si es crítico
     ) {
         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             AsyncImage(
@@ -238,17 +222,39 @@ fun PlantItem(planta: Planta, tiempoActual: Long, onRegarClick: () -> Unit) {
             )
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = if (tieneSed) "${planta.nombre} 😫" else "${planta.nombre} 😊", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = colorTextoPrincipal)
+                // Emoji dinámico según el progreso
+                val emoji = when {
+                    progresoRiego < 0.1f -> "💀"
+                    progresoRiego < 0.2f -> "😫"
+                    progresoRiego < 0.5f -> "😐"
+                    else -> "😊"
+                }
+
+                Text(
+                    text = "${planta.nombre} $emoji",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = colorTextoPrincipal
+                )
                 LinearProgressIndicator(
                     progress = { progresoRiego },
                     modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).height(8.dp).clip(CircleShape),
                     color = colorAlerta,
                     trackColor = colorAlerta.copy(alpha = 0.2f)
                 )
-                Text(text = mensajeTiempo, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = colorTextoPrincipal.copy(alpha = 0.7f))
+                Text(
+                    text = mensajeTiempo,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = colorTextoPrincipal.copy(alpha = 0.7f)
+                )
             }
-            FilledIconButton(onClick = onRegarClick, colors = IconButtonDefaults.filledIconButtonColors(containerColor = colorAlerta), modifier = Modifier.size(48.dp)) {
-                Icon(imageVector = IconoGotaPersonalizado, contentDescription = null, tint = if(minutosRestantes < 45 && minutosRestantes >= 30 && !tieneSed) Color.Black else Color.White)
+            FilledIconButton(
+                onClick = onRegarClick,
+                colors = IconButtonDefaults.filledIconButtonColors(containerColor = colorAlerta),
+                modifier = Modifier.size(48.dp)
+            ) {
+                Icon(imageVector = IconoGotaPersonalizado, contentDescription = null, tint = Color.White)
             }
         }
     }

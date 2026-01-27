@@ -41,6 +41,8 @@ android {
 }
 
 dependencies {
+    val work_version = "2.9.0"
+    implementation("androidx.work:work-runtime-ktx:$work_version")
     implementation("io.coil-kt:coil-compose:2.5.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation(libs.androidx.core.ktx)
@@ -51,6 +53,7 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    implementation("androidx.compose.material:material-icons-extended")
 
     // --- SECCIÓN DE ROOM AGREGADA ---
     val roomVersion = "2.6.1"
