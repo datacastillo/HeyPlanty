@@ -5,24 +5,24 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.jucar.heyplanty.domain.Planta
+import com.jucar.heyplanty.domain.RiegoEvento
 
-// Definimos qué tablas tiene la base de datos y la versión
-@Database(entities = [Planta::class], version = 1)
+@Database(entities = [Planta::class, RiegoEvento::class], version = 2) // Subimos versión
 abstract class AppDatabase : RoomDatabase() {
     abstract fun plantaDao(): PlantaDao
 
     companion object {
-        @Volatile
-        private var INSTANCE: AppDatabase? = null
+        @Volatile private var INSTANCE: AppDatabase? = null
 
         fun getDatabase(context: Context): AppDatabase {
-            // Si ya existe la base de datos, la devolvemos; si no, la creamos
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
                     "heyplanty_db"
-                ).build()
+                )
+                    .fallbackToDestructiveMigration() // Limpia la DB si hay cambios de versión
+                    .build()
                 INSTANCE = instance
                 instance
             }
