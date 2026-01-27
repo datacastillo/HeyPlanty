@@ -15,7 +15,6 @@ interface PlantaDao {
     @Query("UPDATE plantas SET fechaUltimoRiego = :nuevaFecha WHERE id = :plantaId")
     suspend fun actualizarFechaRiego(plantaId: String, nuevaFecha: Long)
 
-    // Nueva función para el Swipe to Dismiss
     @Query("DELETE FROM plantas WHERE id = :plantaId")
     suspend fun borrarPlantaPorId(plantaId: String)
 

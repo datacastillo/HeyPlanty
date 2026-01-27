@@ -1,5 +1,7 @@
 package com.jucar.heyplanty.screens
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -15,19 +17,22 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.compose.runtime.collectAsState
 import com.jucar.heyplanty.domain.Planta
 import com.jucar.heyplanty.components.AddPlantDialog
 import com.jucar.heyplanty.PlantaViewModel
+import kotlinx.coroutines.flow.collectLatest
+import java.util.concurrent.TimeUnit
 
-val IconoGotaAgua: ImageVector
+val IconoGotaPersonalizado: ImageVector
     get() = ImageVector.Builder(
         name = "Gota",
         defaultWidth = 24.dp, defaultHeight = 24.dp,
         viewportWidth = 24f, viewportHeight = 24f
-    ).path(fill = SolidColor(Color(0xFF2196F3))) {
+    ).path(fill = SolidColor(Color.White)) {
         moveTo(12f, 2.15f)
         curveTo(12f, 2.15f, 4f, 10f, 4f, 15.5f)
         curveTo(4f, 19.92f, 7.58f, 23.5f, 12f, 23.5f)
@@ -41,18 +46,43 @@ val IconoGotaAgua: ImageVector
 fun HomeScreen(viewModel: PlantaViewModel = viewModel()) {
     var showDialog by remember { mutableStateOf(false) }
     val misPlantas by viewModel.todasLasPlantas.collectAsState(initial = emptyList())
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(Unit) {
+        viewModel.eventoRiego.collectLatest { mensaje ->
+            snackbarHostState.showSnackbar(mensaje)
+        }
+    }
 
     Scaffold(
-        topBar = { CenterAlignedTopAppBar(title = { Text("HeyPlanty 🌿") }) },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = { Text("HeyPlanty 🌿", fontWeight = FontWeight.Bold) }
+            )
+        },
         floatingActionButton = {
             FloatingActionButton(onClick = { showDialog = true }) {
-                Icon(Icons.Default.Add, contentDescription = "Agregar")
+                Icon(Icons.Default.Add, contentDescription = "Nueva Planta")
             }
         }
     ) { padding ->
         Box(modifier = Modifier.padding(padding)) {
-            LazyColumn(modifier = Modifier.fillMaxSize()) {
-                items(items = misPlantas, key = { it.id }) { planta ->
+            if (misPlantas.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("No tienes plantas aún. ¡Añade una! 🌱", color = Color.Gray)
+                }
+            }
+
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(
+                    items = misPlantas,
+                    key = { it.id + it.fechaUltimoRiego }
+                ) { planta ->
                     val dismissState = rememberSwipeToDismissBoxState(
                         confirmValueChange = { value ->
                             if (value == SwipeToDismissBoxValue.EndToStart) {
@@ -66,20 +96,15 @@ fun HomeScreen(viewModel: PlantaViewModel = viewModel()) {
                         state = dismissState,
                         enableDismissFromStartToEnd = false,
                         backgroundContent = {
-                            val color = if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart)
-                                Color.Red.copy(alpha = 0.7f) else Color.Transparent
                             Box(
-                                modifier = Modifier.fillMaxSize().padding(8.dp).background(color, MaterialTheme.shapes.medium),
+                                Modifier.fillMaxSize().padding(vertical = 4.dp).background(Color(0xFFE57373), MaterialTheme.shapes.large),
                                 contentAlignment = Alignment.CenterEnd
                             ) {
-                                Icon(Icons.Default.Delete, contentDescription = "Borrar", tint = Color.White, modifier = Modifier.padding(end = 16.dp))
+                                Icon(Icons.Default.Delete, contentDescription = null, tint = Color.White, modifier = Modifier.padding(end = 20.dp))
                             }
                         }
                     ) {
-                        PlantItem(
-                            planta = planta,
-                            onRegarClick = { viewModel.regarPlanta(planta.id) }
-                        )
+                        PlantItem(planta = planta, onRegarClick = { viewModel.regarPlanta(planta) })
                     }
                 }
             }
@@ -93,30 +118,57 @@ fun HomeScreen(viewModel: PlantaViewModel = viewModel()) {
 
 @Composable
 fun PlantItem(planta: Planta, onRegarClick: () -> Unit) {
-    // DETERMINAR COLORES SEGÚN LA SED
-    val colorFondo = if (planta.tieneSed()) Color(0xFFFFEBEE) else MaterialTheme.colorScheme.surfaceVariant
-    val colorBorde = if (planta.tieneSed()) Color(0xFFFFCDD2) else Color.Transparent
+    val tieneSed = remember(planta.fechaUltimoRiego) { planta.tieneSed() }
+
+    // Cálculo de tiempo restante
+    val mensajeTiempo = remember(planta.fechaUltimoRiego) {
+        val ahora = System.currentTimeMillis()
+        val proximoRiego = planta.fechaUltimoRiego + (planta.diasEntreRiegos * 24 * 60 * 60 * 1000L)
+        val diferencia = proximoRiego - ahora
+
+        if (diferencia < 0) {
+            val diasPasados = TimeUnit.MILLISECONDS.toDays(Math.abs(diferencia))
+            if (diasPasados == 0L) "¡Le toca hoy!" else "Retraso de $diasPasados días"
+        } else {
+            val diasRestantes = TimeUnit.MILLISECONDS.toDays(diferencia)
+            if (diasRestantes == 0L) "Toca regar mañana" else "Siguiente riego en $diasRestantes días"
+        }
+    }
+
+    val colorDestino = if (tieneSed) Color(0xFFFFEBEE) else Color(0xFFF1F8E9)
+    val colorContenido = if (tieneSed) Color(0xFFB71C1C) else Color(0xFF2E7D32)
+    val colorBoton = if (tieneSed) Color(0xFFD32F2F) else Color(0xFF4CAF50)
+
+    val colorAnimado by animateColorAsState(targetValue = colorDestino, animationSpec = tween(500), label = "")
 
     Card(
-        modifier = Modifier.fillMaxWidth().padding(8.dp),
-        colors = CardDefaults.cardColors(containerColor = colorFondo),
-        border = if (planta.tieneSed()) androidx.compose.foundation.BorderStroke(1.dp, colorBorde) else null
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = colorAnimado),
+        shape = MaterialTheme.shapes.large,
+        elevation = CardDefaults.cardElevation(2.dp)
     ) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = if (planta.tieneSed()) "${planta.nombre} 😫" else planta.nombre,
+                    text = if (tieneSed) "${planta.nombre} 😫" else "${planta.nombre} 😊",
                     style = MaterialTheme.typography.titleLarge,
-                    color = if (planta.tieneSed()) Color(0xFFB71C1C) else Color.Unspecified
+                    fontWeight = FontWeight.Bold,
+                    color = colorContenido
                 )
                 Text(
-                    text = if (planta.tieneSed()) "¡NECESITA AGUA!" else "Riego: cada ${planta.diasEntreRiegos} días",
+                    text = mensajeTiempo, // <-- NUEVO: Información de tiempo real
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (planta.tieneSed()) Color(0xFFD32F2F) else Color.Unspecified
+                    fontWeight = FontWeight.Medium,
+                    color = colorContenido.copy(alpha = 0.8f)
                 )
             }
-            IconButton(onClick = onRegarClick) {
-                Icon(imageVector = IconoGotaAgua, contentDescription = null, tint = Color.Unspecified)
+
+            FilledIconButton(
+                onClick = onRegarClick,
+                colors = IconButtonDefaults.filledIconButtonColors(containerColor = colorBoton),
+                modifier = Modifier.size(50.dp)
+            ) {
+                Icon(imageVector = IconoGotaPersonalizado, contentDescription = "Regar", tint = Color.White)
             }
         }
     }

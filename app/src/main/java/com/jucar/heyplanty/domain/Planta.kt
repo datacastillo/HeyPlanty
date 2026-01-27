@@ -14,10 +14,10 @@ data class Planta(
     val fechaUltimoRiego: Long,
     val nivelDrama: Int = 3
 ) {
-    // FUNCIÓN NUEVA: Calcula si la planta necesita agua ya mismo
     fun tieneSed(): Boolean {
-        val tiempoTranscurrido = System.currentTimeMillis() - fechaUltimoRiego
-        val diasEnMilisegundos = diasEntreRiegos * 24 * 60 * 60 * 1000L
-        return tiempoTranscurrido >= diasEnMilisegundos
+        val ahora = System.currentTimeMillis()
+        val tiempoTranscurrido = ahora - fechaUltimoRiego
+        val intervaloMilis = diasEntreRiegos * 24 * 60 * 60 * 1000L
+        return tiempoTranscurrido >= intervaloMilis
     }
 }
