@@ -30,7 +30,6 @@ class PlantaViewModel(application: Application) : AndroidViewModel(application) 
     val eventoRiego = _eventoRiego.asSharedFlow()
     private var mediaPlayer: MediaPlayer? = null
 
-    // Función que usa tu NotifyWorker.kt
     private fun programarNotificacion(planta: Planta) {
         val delayMilis = (planta.diasEntreRiegos * 60 * 1000L)
         val data = workDataOf("plant_name" to planta.nombre)
@@ -78,18 +77,18 @@ class PlantaViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun agregarPlanta(nombre: String, especie: String, h: Int, m: Int, uri: String?, consejo: String) {
+    // REPARACIÓN: Parámetros simplificados para evitar desincronización
+    fun agregarPlanta(nombre: String, especie: String, totalMinutos: Int, rutaImagen: String?, consejo: String) {
         viewModelScope.launch {
             try {
-                val totalMinutos = (h * 60) + m
-                val rutaFinal = uri?.let { guardarImagen(it) }
-                // Iniciamos al 90% para evitar el error de "Exceso" al crearla
-                val fechaAjustada = System.currentTimeMillis() - (totalMinutos * 60 * 100L)
-
                 val nueva = Planta(
-                    nombre = nombre, especie = especie, consejo = consejo,
+                    nombre = nombre,
+                    especie = especie,
+                    consejo = consejo,
                     diasEntreRiegos = if (totalMinutos <= 0) 1 else totalMinutos,
-                    fechaUltimoRiego = fechaAjustada, imagenUri = rutaFinal, salud = 100
+                    fechaUltimoRiego = System.currentTimeMillis(), // Empieza ahora
+                    imagenUri = rutaImagen,
+                    salud = 100
                 )
                 plantaDao.insertPlanta(nueva)
                 programarNotificacion(nueva)
@@ -104,16 +103,6 @@ class PlantaViewModel(application: Application) : AndroidViewModel(application) 
             plantaDao.borrarPlantaPorId(planta.id)
             planta.imagenUri?.let { File(it).delete() }
         }
-    }
-
-    private fun guardarImagen(uriStr: String): String? {
-        return try {
-            val context = getApplication<Application>().applicationContext
-            val ins = context.contentResolver.openInputStream(Uri.parse(uriStr))
-            val file = File(context.filesDir, "planta_${System.currentTimeMillis()}.jpg")
-            ins?.use { input -> FileOutputStream(file).use { output -> input.copyTo(output) } }
-            file.absolutePath
-        } catch (e: Exception) { null }
     }
 
     private fun ejecutarEfectosRiego(esExceso: Boolean) {
