@@ -67,30 +67,60 @@ fun AddPlantDialog(
         }
     }
 
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Surface(
-            modifier = Modifier.fillMaxWidth(0.95f).wrapContentHeight(),
+            modifier = Modifier
+                .fillMaxWidth(0.95f)
+                .wrapContentHeight(),
             shape = RoundedCornerShape(28.dp),
             color = Color.White
         ) {
-            Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Nueva Integrante 🌿", fontSize = 22.sp, fontWeight = FontWeight.Black, color = Color(0xFF1B5E20))
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Nueva Integrante 🌿",
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color(0xFF1B5E20)
+                )
 
-                Spacer(Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                Box(Modifier.size(100.dp).clip(CircleShape).background(Color(0xFFF1F8E9)).clickable { launcher.launch("image/*") }) {
+                Box(
+                    modifier = Modifier
+                        .size(100.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFF1F8E9))
+                        .clickable { launcher.launch("image/*") }
+                ) {
                     if (imagenUri != null) {
-                        AsyncImage(model = File(imagenUri!!), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                        AsyncImage(
+                            model = File(imagenUri!!),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
                     } else {
-                        Icon(Icons.Default.AddAPhoto, null, Modifier.align(Alignment.Center), tint = Color(0xFF4CAF50))
+                        Icon(
+                            imageVector = Icons.Default.AddAPhoto,
+                            contentDescription = null,
+                            modifier = Modifier.align(Alignment.Center),
+                            tint = Color(0xFF4CAF50)
+                        )
                     }
                 }
 
-                Spacer(Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 OutlinedTextField(
-                    value = nombre, onValueChange = { nombre = it },
-                    label = { Text("Nombre") },
+                    value = nombre,
+                    onValueChange = { nombre = it },
+                    label = { Text("Nombre de la planta") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -100,7 +130,7 @@ fun AddPlantDialog(
                     )
                 )
 
-                Spacer(Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 LazyRow(
                     modifier = Modifier.fillMaxWidth(),
@@ -118,13 +148,17 @@ fun AddPlantDialog(
                             },
                             label = { Text(sug) },
                             shape = RoundedCornerShape(12.dp),
-                            colors = SuggestionChipDefaults.suggestionChipColors(labelColor = Color(0xFF2E7D32), containerColor = Color(0xFFE8F5E9))
+                            colors = SuggestionChipDefaults.suggestionChipColors(
+                                labelColor = Color(0xFF2E7D32),
+                                containerColor = Color(0xFFE8F5E9)
+                            )
                         )
                     }
                 }
 
                 OutlinedTextField(
-                    value = especie, onValueChange = { especie = it },
+                    value = especie,
+                    onValueChange = { especie = it },
                     label = { Text("Especie") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
@@ -135,19 +169,38 @@ fun AddPlantDialog(
                     )
                 )
 
-                Spacer(Modifier.height(20.dp))
-                Text("Frecuencia de Riego", fontWeight = FontWeight.Bold, color = Color.Gray, fontSize = 14.sp)
+                Spacer(modifier = Modifier.height(20.dp))
 
-                Row(Modifier.fillMaxWidth().height(150.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+                Text(
+                    text = "Frecuencia de Riego",
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Gray,
+                    fontSize = 14.sp
+                )
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(150.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
                     TimeWheelPicker(count = 31, label = "Días", value = selDias) { selDias = it }
                     TimeWheelPicker(count = 24, label = "Horas", value = selHoras) { selHoras = it }
                     TimeWheelPicker(count = 60, label = "Min", value = selMinutos) { selMinutos = it }
                 }
 
-                Spacer(Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    TextButton(onClick = onDismiss, Modifier.weight(1f)) { Text("CANCELAR", color = Color.Gray) }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    TextButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("CANCELAR", color = Color.Gray)
+                    }
                     Button(
                         onClick = {
                             val totalMin = (selDias * 1440) + (selHoras * 60) + selMinutos
@@ -158,7 +211,9 @@ fun AddPlantDialog(
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
                         shape = RoundedCornerShape(12.dp)
-                    ) { Text("GUARDAR", fontWeight = FontWeight.Bold) }
+                    ) {
+                        Text("GUARDAR", fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
@@ -184,8 +239,18 @@ fun TimeWheelPicker(count: Int, label: String, value: Int, onSelect: (Int) -> Un
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(label, fontSize = 12.sp, color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold)
-        Box(Modifier.height(itemHeight * 3).width(75.dp), contentAlignment = Alignment.Center) {
-            Box(Modifier.fillMaxWidth().height(itemHeight).background(Color(0xFFE8F5E9), RoundedCornerShape(12.dp)))
+        Box(
+            modifier = Modifier
+                .height(itemHeight * 3)
+                .width(75.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(itemHeight)
+                    .background(Color(0xFFE8F5E9), RoundedCornerShape(12.dp))
+            )
             LazyColumn(
                 state = listState,
                 flingBehavior = snapBehavior,
@@ -194,7 +259,12 @@ fun TimeWheelPicker(count: Int, label: String, value: Int, onSelect: (Int) -> Un
                 contentPadding = PaddingValues(vertical = itemHeight)
             ) {
                 items(count) { i ->
-                    Box(Modifier.height(itemHeight).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Box(
+                        modifier = Modifier
+                            .height(itemHeight)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
                         Text(
                             text = i.toString(),
                             fontSize = 22.sp,
