@@ -69,21 +69,21 @@ fun HomeScreen(viewModel: PlantaViewModel = viewModel()) {
         }
     }
 
-    // --- DISEÑO DE FONDO (MESH GRADIENT) ---
+    // --- DISEÑO DE FONDO (MESH GRADIENT MEJORADO) ---
     val meshGradient = Brush.verticalGradient(
-        colors = listOf(Color(0xFFF0F7F0), Color(0xFFFFFFFF), Color(0xFFF9FBF9))
+        colors = listOf(Color(0xFFEBF5EB), Color(0xFFFFFFFF), Color(0xFFF4F9F4))
     )
 
     Box(modifier = Modifier.fillMaxSize().background(meshGradient)) {
-        // Círculos difusos decorativos para estética orgánica
+        // Orbes decorativos con desenfoque profundo
         Canvas(
             modifier = Modifier
-                .size(450.dp)
+                .size(500.dp)
                 .align(Alignment.TopEnd)
-                .offset(x = 180.dp, y = (-120).dp)
-                .blur(100.dp)
+                .offset(x = 150.dp, y = (-150).dp)
+                .blur(120.dp)
         ) {
-            drawCircle(color = Color(0xFFC8E6C9).copy(alpha = 0.5f))
+            drawCircle(color = Color(0xFF81C784).copy(alpha = 0.25f))
         }
 
         Scaffold(
@@ -95,15 +95,18 @@ fun HomeScreen(viewModel: PlantaViewModel = viewModel()) {
                     title = {
                         Text(
                             text = "HeyPlanty",
-                            fontWeight = FontWeight.Black,
-                            fontSize = 26.sp,
-                            color = Color(0xFF1B5E20),
-                            letterSpacing = (-1).sp
+                            style = MaterialTheme.typography.headlineMedium.copy(
+                                fontWeight = FontWeight.Black,
+                                color = Color(0xFF1B5E20),
+                                letterSpacing = (-1.5).sp
+                            )
                         )
                     },
                     actions = {
                         IconButton(onClick = { /* Perfil */ }) {
-                            Icon(Icons.Default.AccountCircle, "Perfil", tint = Color(0xFF4CAF50), modifier = Modifier.size(28.dp))
+                            Surface(shape = CircleShape, color = Color.White.copy(0.6f), modifier = Modifier.size(40.dp)) {
+                                Icon(Icons.Default.AccountCircle, "Perfil", tint = Color(0xFF4CAF50), modifier = Modifier.padding(4.dp))
+                            }
                         }
                         IconButton(onClick = {
                             isSearching = !isSearching
@@ -121,10 +124,10 @@ fun HomeScreen(viewModel: PlantaViewModel = viewModel()) {
             floatingActionButton = {
                 FloatingActionButton(
                     onClick = { showDialog = true },
-                    containerColor = Color(0xFF4CAF50),
+                    containerColor = Color(0xFF2E7D32),
                     contentColor = Color.White,
-                    shape = RoundedCornerShape(20.dp),
-                    elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 8.dp)
+                    shape = RoundedCornerShape(22.dp),
+                    elevation = FloatingActionButtonDefaults.elevation(12.dp)
                 ) {
                     Icon(Icons.Default.Add, "Añadir", modifier = Modifier.size(32.dp))
                 }
@@ -132,7 +135,7 @@ fun HomeScreen(viewModel: PlantaViewModel = viewModel()) {
         ) { padding ->
             Column(modifier = Modifier.padding(padding).fillMaxSize()) {
 
-                // --- SECCIÓN DE BIENVENIDA Y STATUS ---
+                // --- SECCIÓN DE BIENVENIDA ---
                 if (!isSearching) {
                     Column(
                         modifier = Modifier
@@ -148,20 +151,20 @@ fun HomeScreen(viewModel: PlantaViewModel = viewModel()) {
 
                         Text(
                             text = if (misPlantas.isEmpty()) "¡Bienvenido! 👋" else "Jardín de $nombreUsuario",
-                            fontSize = 30.sp,
+                            fontSize = 32.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = Color(0xFF1B301B),
                             letterSpacing = (-0.5).sp
                         )
                         Text(
                             text = saludoTexto,
-                            fontSize = 17.sp,
+                            fontSize = 18.sp,
                             color = Color(0xFF4CAF50),
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.padding(bottom = 16.dp)
                         )
 
-                        // --- LA TARJETA "PRO" DE STATUS ---
+                        // --- TARJETA DE STATUS "WOW" ---
                         val totalPlantas = misPlantas.size
                         val necesitanAgua = misPlantas.count {
                             (it.fechaUltimoRiego + (it.diasEntreRiegos * 60 * 1000L)) - tiempoActual <= 0
@@ -171,54 +174,58 @@ fun HomeScreen(viewModel: PlantaViewModel = viewModel()) {
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(32.dp),
-                            color = Color.White.copy(alpha = 0.9f),
-                            shadowElevation = 12.dp,
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White)
+                            color = Color.White,
+                            shadowElevation = 15.dp,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE8F5E9))
                         ) {
                             Row(
                                 modifier = Modifier.padding(24.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // Badge Circular con Gradiente
                                 Box(
                                     contentAlignment = Alignment.Center,
                                     modifier = Modifier
-                                        .size(64.dp)
+                                        .size(68.dp)
                                         .background(
-                                            Brush.linearGradient(listOf(Color(0xFF2E7D32), Color(0xFF1B5E20))),
+                                            Brush.sweepGradient(listOf(Color(0xFF4CAF50), Color(0xFF1B5E20), Color(0xFF4CAF50))),
                                             CircleShape
                                         )
+                                        .padding(3.dp)
                                 ) {
-                                    Text("$totalPlantas", color = Color.White, fontWeight = FontWeight.Black, fontSize = 24.sp)
+                                    Surface(shape = CircleShape, color = Color(0xFF1B5E20), modifier = Modifier.fillMaxSize()) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Text("$totalPlantas", color = Color.White, fontWeight = FontWeight.Black, fontSize = 26.sp)
+                                        }
+                                    }
                                 }
 
                                 Spacer(modifier = Modifier.width(20.dp))
 
                                 Column {
                                     Text(
-                                        text = if(totalPlantas == 1) "PLANTA EN COLECCIÓN" else "PLANTAS TOTALES",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.Gray,
-                                        letterSpacing = 1.sp
+                                        text = "ESTADO DEL JARDÍN",
+                                        style = MaterialTheme.typography.labelMedium.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.LightGray,
+                                            letterSpacing = 1.5.sp
+                                        )
                                     )
 
-                                    // Píldora de estado con animación de respiración
                                     val infiniteTransition = rememberInfiniteTransition(label = "")
                                     val alpha by infiniteTransition.animateFloat(
                                         initialValue = 0.4f, targetValue = 1f,
-                                        animationSpec = infiniteRepeatable(tween(1200), RepeatMode.Reverse), label = ""
+                                        animationSpec = infiniteRepeatable(tween(1000), RepeatMode.Reverse), label = ""
                                     )
 
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
                                         modifier = Modifier
                                             .padding(top = 6.dp)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(statusColor.copy(alpha = 0.1f))
-                                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                                            .clip(RoundedCornerShape(14.dp))
+                                            .background(statusColor.copy(alpha = 0.12f))
+                                            .padding(horizontal = 12.dp, vertical = 6.dp)
                                     ) {
-                                        Box(modifier = Modifier.size(8.dp).background(statusColor.copy(alpha = alpha), CircleShape))
+                                        Box(modifier = Modifier.size(10.dp).background(statusColor.copy(alpha = alpha), CircleShape))
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(
                                             text = when {
@@ -226,7 +233,7 @@ fun HomeScreen(viewModel: PlantaViewModel = viewModel()) {
                                                 necesitanAgua > 0 -> "Tienes $necesitanAgua sedientas"
                                                 else -> "Todo perfecto ✅"
                                             },
-                                            fontSize = 15.sp,
+                                            fontSize = 16.sp,
                                             fontWeight = FontWeight.ExtraBold,
                                             color = statusColor
                                         )
@@ -248,10 +255,10 @@ fun HomeScreen(viewModel: PlantaViewModel = viewModel()) {
                         onValueChange = { searchText = it },
                         modifier = Modifier.fillMaxWidth().padding(16.dp),
                         placeholder = { Text("¿Qué planta buscas?") },
-                        shape = RoundedCornerShape(20.dp),
+                        shape = RoundedCornerShape(24.dp),
                         colors = TextFieldDefaults.colors(
                             focusedContainerColor = Color.White,
-                            unfocusedContainerColor = Color.White.copy(alpha = 0.8f),
+                            unfocusedContainerColor = Color.White.copy(0.7f),
                             focusedIndicatorColor = Color.Transparent,
                             unfocusedIndicatorColor = Color.Transparent
                         ),
@@ -263,18 +270,12 @@ fun HomeScreen(viewModel: PlantaViewModel = viewModel()) {
                 val filtradas = misPlantas.filter { it.nombre.contains(searchText, ignoreCase = true) }
 
                 if (misPlantas.isEmpty() && !isSearching) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Default.Spa, null, modifier = Modifier.size(80.dp), tint = Color(0xFFE8F5E9))
-                            Spacer(Modifier.height(16.dp))
-                            Text("Tu jardín está vacío", fontWeight = FontWeight.Bold, color = Color.LightGray)
-                        }
-                    }
+                    EmptyJardinIllustration()
                 } else {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 100.dp),
-                        verticalArrangement = Arrangement.spacedBy(20.dp)
+                        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 120.dp),
+                        verticalArrangement = Arrangement.spacedBy(22.dp)
                     ) {
                         items(filtradas, key = { it.id }) { planta ->
                             val dismissState = rememberSwipeToDismissBoxState()
@@ -288,12 +289,11 @@ fun HomeScreen(viewModel: PlantaViewModel = viewModel()) {
                                 state = dismissState,
                                 enableDismissFromStartToEnd = false,
                                 backgroundContent = {
-                                    val color = if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) Color(0xFFFFEBEE) else Color.Transparent
                                     Box(
-                                        modifier = Modifier.fillMaxSize().background(color, RoundedCornerShape(32.dp)).padding(end = 24.dp),
+                                        modifier = Modifier.fillMaxSize().background(Color(0xFFFFEBEE), RoundedCornerShape(32.dp)).padding(end = 24.dp),
                                         contentAlignment = Alignment.CenterEnd
                                     ) {
-                                        Icon(Icons.Default.Delete, "Eliminar", tint = Color.Red)
+                                        Icon(Icons.Default.Delete, "Eliminar", tint = Color(0xFFD32F2F), modifier = Modifier.size(28.dp))
                                     }
                                 }
                             ) {
@@ -325,76 +325,65 @@ fun PlantItem(planta: Planta, tiempoActual: Long, onRegar: () -> Unit, viewModel
     val progreso = planta.obtenerProgresoRiego()
     val frecuenciaMilis = planta.diasEntreRiegos * 60 * 1000L
     val restanteMilis = (planta.fechaUltimoRiego + frecuenciaMilis) - tiempoActual
+    val esUrgente = restanteMilis <= 0
 
-    // Color dinámico según la urgencia
     val cardColor = when {
-        restanteMilis <= 0 -> Color(0xFFFFEBEE)
-        restanteMilis < 3600000L -> Color(0xFFFFF8E1)
+        esUrgente -> Color(0xFFFFF5F5)
+        restanteMilis < 3600000L -> Color(0xFFFFFBF0)
         else -> Color.White
     }
 
     Surface(
-        modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { expanded = !expanded },
         shape = RoundedCornerShape(32.dp),
         color = cardColor,
-        shadowElevation = 6.dp,
+        shadowElevation = if (esUrgente) 8.dp else 4.dp,
         border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFF1F8E9))
     ) {
         Column(modifier = Modifier.animateContentSize().padding(22.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // Imagen con contenedor moderno
-                Box(
-                    modifier = Modifier
-                        .size(80.dp)
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(Color(0xFFE8F5E9))
-                ) {
+                Box(modifier = Modifier.size(85.dp).clip(RoundedCornerShape(24.dp)).background(Color(0xFFE8F5E9))) {
                     if (!planta.imagenUri.isNullOrEmpty()) {
-                        AsyncImage(
-                            model = File(planta.imagenUri!!),
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
-                        )
+                        AsyncImage(model = File(planta.imagenUri!!), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                     } else {
-                        Icon(Icons.Default.LocalFlorist, null, modifier = Modifier.align(Alignment.Center), tint = Color(0xFF4CAF50))
+                        Icon(Icons.Default.Spa, null, modifier = Modifier.align(Alignment.Center).size(35.dp), tint = Color(0xFF4CAF50))
                     }
                 }
 
                 Spacer(modifier = Modifier.width(18.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(planta.nombre, fontWeight = FontWeight.Black, fontSize = 21.sp, color = Color(0xFF1B301B))
+                    Text(planta.nombre, fontWeight = FontWeight.Black, fontSize = 22.sp, color = Color(0xFF1B301B))
                     Text(planta.especie, fontSize = 14.sp, color = Color.Gray, fontWeight = FontWeight.Medium)
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                    // Barra de Progreso estilizada
                     LinearProgressIndicator(
                         progress = { progreso.coerceIn(0f, 1f) },
                         modifier = Modifier.fillMaxWidth().height(10.dp).clip(CircleShape),
-                        color = if (restanteMilis <= 0) Color(0xFFFF5252) else Color(0xFF4CAF50),
-                        trackColor = Color(0xFFF1F8E9)
+                        color = if (esUrgente) Color(0xFFFF5252) else Color(0xFF4CAF50),
+                        trackColor = Color(0xFFE8F5E9)
                     )
 
                     val totalS = (restanteMilis / 1000).coerceAtLeast(0)
                     val h = totalS / 3600; val m = (totalS % 3600) / 60; val s = totalS % 60
                     Text(
-                        text = if (restanteMilis <= 0) "¡Sedienta ahora! 💧" else "Riego en: ${h}h ${m}m ${s}s",
-                        fontSize = 12.sp,
+                        text = if (esUrgente) "¡Necesita agua! 💧" else "Próximo riego: ${h}h ${m}m ${s}s",
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (restanteMilis <= 0) Color.Red else Color.Gray,
-                        modifier = Modifier.padding(top = 4.dp)
+                        color = if (esUrgente) Color(0xFFD32F2F) else Color(0xFF4CAF50),
+                        modifier = Modifier.padding(top = 6.dp)
                     )
                 }
 
-                // Botón de Riego Circular
                 IconButton(
                     onClick = onRegar,
                     modifier = Modifier
-                        .size(54.dp)
+                        .size(56.dp)
                         .background(
-                            Brush.linearGradient(listOf(Color(0xFF66BB6A), Color(0xFF43A047))),
+                            Brush.verticalGradient(listOf(Color(0xFF66BB6A), Color(0xFF2E7D32))),
                             CircleShape
                         )
                 ) {
@@ -402,46 +391,42 @@ fun PlantItem(planta: Planta, tiempoActual: Long, onRegar: () -> Unit, viewModel
                 }
             }
 
-            // --- DETALLE EXPANDIDO: HISTORIAL ---
             if (expanded) {
                 Spacer(modifier = Modifier.height(20.dp))
                 HorizontalDivider(color = Color(0xFFE8F5E9), thickness = 1.dp)
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    "ÚLTIMOS CUIDADOS 📝",
+                    "BITÁCORA DE CUIDADOS 📝",
                     style = MaterialTheme.typography.labelSmall.copy(
-                        fontWeight = FontWeight.ExtraBold,
+                        fontWeight = FontWeight.Black,
                         letterSpacing = 1.2.sp,
                         color = Color(0xFF2E7D32)
                     )
                 )
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 if (historial.isEmpty()) {
-                    Text("No hay registros aún", fontSize = 12.sp, color = Color.LightGray)
+                    Text("No hay registros de riego aún", fontSize = 13.sp, color = Color.LightGray)
                 } else {
                     historial.take(3).forEach { evento ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+                        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                             val colorIcono = if(evento.esSobrerego) Color(0xFF1976D2) else Color(0xFF4CAF50)
                             Icon(
                                 imageVector = if(evento.esSobrerego) Icons.Default.Waves else Icons.Default.CheckCircle,
                                 contentDescription = null,
                                 tint = colorIcono,
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text(
-                                    text = if(evento.esSobrerego) "Hidratación extra" else "Riego completado",
-                                    fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1B301B)
+                                    text = if(evento.esSobrerego) "Hidratación extra" else "Riego exitoso",
+                                    fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1B301B)
                                 )
                                 Text(
-                                    text = SimpleDateFormat("dd MMMM, HH:mm", Locale.getDefault()).format(Date(evento.fecha)),
+                                    text = SimpleDateFormat("EEEE, dd MMM • HH:mm", Locale.getDefault()).format(Date(evento.fecha)),
                                     fontSize = 12.sp, color = Color.Gray
                                 )
                             }
@@ -449,6 +434,20 @@ fun PlantItem(planta: Planta, tiempoActual: Long, onRegar: () -> Unit, viewModel
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun EmptyJardinIllustration() {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Surface(shape = CircleShape, color = Color(0xFFF1F8E9), modifier = Modifier.size(120.dp)) {
+                Icon(Icons.Default.Spa, null, modifier = Modifier.padding(30.dp), tint = Color(0xFFC8E6C9))
+            }
+            Spacer(Modifier.height(20.dp))
+            Text("Tu jardín está en silencio", fontWeight = FontWeight.ExtraBold, color = Color(0xFF1B5E20), fontSize = 18.sp)
+            Text("¡Añade una planta para comenzar!", color = Color.Gray, fontSize = 14.sp)
         }
     }
 }
