@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
+import com.jucar.heyplanty.domain.Planta
 import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
@@ -36,12 +37,13 @@ import java.io.FileOutputStream
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddPlantDialog(
+    plantaAEditar: Planta? = null, // Inyección para edición
     onDismiss: () -> Unit,
     onPlantAdded: (String, String, Int, Int, String?, Color) -> Unit
 ) {
-    var nombre by remember { mutableStateOf("") }
-    var especie by remember { mutableStateOf("") }
-    var imagenUri by remember { mutableStateOf<String?>(null) }
+    var nombre by remember { mutableStateOf(plantaAEditar?.nombre ?: "") }
+    var especie by remember { mutableStateOf(plantaAEditar?.especie ?: "") }
+    var imagenUri by remember { mutableStateOf<String?>(plantaAEditar?.imagenUri) }
 
     val sugerencias = mapOf(
         "Cactus 🌵" to Triple(15, 0, 0),
@@ -52,9 +54,11 @@ fun AddPlantDialog(
         "Monstera 🍃" to Triple(5, 0, 0)
     )
 
-    var selDias by remember { mutableIntStateOf(0) }
-    var selHoras by remember { mutableIntStateOf(0) }
-    var selMinutos by remember { mutableIntStateOf(30) }
+    // Lógica para precargar tiempos en edición
+    val totalOriginal = plantaAEditar?.diasEntreRiegos ?: 30
+    var selDias by remember { mutableIntStateOf(if(plantaAEditar != null) totalOriginal / 1440 else 0) }
+    var selHoras by remember { mutableIntStateOf(if(plantaAEditar != null) (totalOriginal % 1440) / 60 else 0) }
+    var selMinutos by remember { mutableIntStateOf(if(plantaAEditar != null) totalOriginal % 60 else 30) }
 
     val context = LocalContext.current
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
@@ -83,7 +87,7 @@ fun AddPlantDialog(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "Nueva Integrante 🌿",
+                    text = if(plantaAEditar == null) "Nueva Integrante 🌿" else "Editar Planta ✏️",
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Black,
                     color = Color(0xFF1B5E20)
@@ -205,14 +209,14 @@ fun AddPlantDialog(
                         onClick = {
                             val totalMin = (selDias * 1440) + (selHoras * 60) + selMinutos
                             if (nombre.isNotBlank() && totalMin > 0) {
-                                onPlantAdded(nombre, especie, totalMin, 100, imagenUri, Color(0xFF4CAF50))
+                                onPlantAdded(nombre, especie, totalMin, plantaAEditar?.salud ?: 100, imagenUri, Color(0xFF4CAF50))
                             }
                         },
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text("GUARDAR", fontWeight = FontWeight.Bold)
+                        Text(if(plantaAEditar == null) "GUARDAR" else "ACTUALIZAR", fontWeight = FontWeight.Bold)
                     }
                 }
             }

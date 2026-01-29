@@ -19,7 +19,6 @@ interface PlantaDao {
     @Query("DELETE FROM plantas WHERE id = :plantaId")
     suspend fun borrarPlantaPorId(plantaId: String)
 
-    // CONSULTAS PARA EL HISTORIAL
     @Insert
     suspend fun insertarEventoRiego(evento: RiegoEvento)
 
