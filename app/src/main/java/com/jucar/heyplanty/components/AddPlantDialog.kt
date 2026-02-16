@@ -55,7 +55,7 @@ fun AddPlantDialog(
     )
 
     // Lógica para precargar tiempos en edición
-    val totalOriginal = plantaAEditar?.diasEntreRiegos ?: 30
+    val totalOriginal = plantaAEditar?.minutosEntreRiegos ?: 30
     var selDias by remember { mutableIntStateOf(if(plantaAEditar != null) totalOriginal / 1440 else 0) }
     var selHoras by remember { mutableIntStateOf(if(plantaAEditar != null) (totalOriginal % 1440) / 60 else 0) }
     var selMinutos by remember { mutableIntStateOf(if(plantaAEditar != null) totalOriginal % 60 else 30) }

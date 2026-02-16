@@ -13,7 +13,6 @@ import androidx.work.*
 import com.jucar.heyplanty.data.AppDatabase
 import com.jucar.heyplanty.domain.Planta
 import com.jucar.heyplanty.domain.RiegoEvento
-import com.jucar.heyplanty.screens.obtenerProgresoRiego
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -33,7 +32,7 @@ class PlantaViewModel(application: Application) : AndroidViewModel(application) 
     private var mediaPlayer: MediaPlayer? = null
 
     private fun programarNotificacion(planta: Planta) {
-        val delayMilis = (planta.diasEntreRiegos * 60 * 1000L)
+        val delayMilis = (planta.minutosEntreRiegos * 60 * 1000L)
         val data = workDataOf("plant_name" to planta.nombre)
 
         val pedidoRiego = OneTimeWorkRequestBuilder<NotifyWorker>()
@@ -57,27 +56,54 @@ class PlantaViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             try {
                 val ahora = System.currentTimeMillis()
-                val progreso = planta.obtenerProgresoRiego()
+                val progreso = planta.obtenerProgresoRiego() // Progress before watering
 
-                // VALIDACIÓN DE EXCESO (Si tiene más del 85% de humedad)
+                // --- 1. PENALIZACIÓN POR SOBRERIEGO ---
                 if (progreso > 0.85f && planta.fechaUltimoRiego != 0L) {
                     ejecutarEfectosRiego(esExceso = true)
-                    _eventoRiego.emit(RiegoResult("¡Cuidado! ${planta.nombre} aún tiene agua. Ya no me riegues por ahora 🌊", true))
+                    val nuevaSalud = (planta.salud - 15).coerceAtLeast(0) // Reduce health for overwatering
+                    val vecesSobreregadas = planta.vecesSobreregada + 1
+                    val plantaActualizada = planta.copy(
+                        salud = nuevaSalud,
+                        vecesSobreregada = vecesSobreregadas,
+                        // No actualizamos fecha de riego para no "premiar" el sobreriego
+                    )
+                    plantaDao.insertPlanta(plantaActualizada)
+                    plantaDao.insertarEventoRiego(
+                        RiegoEvento(plantaId = planta.id, fecha = ahora, fuePuntual = false, esSobrerego = true)
+                    )
+                    _eventoRiego.emit(RiegoResult("¡Cuidado! ${planta.nombre} aún tiene agua. El exceso de riego daña sus raíces.", true))
                     return@launch
                 }
 
-                // RIEGO CORRECTO
+                // --- 2. CÁLCULO DE VITALIDAD POR RETRASO (SI APLICA) ---
+                val intervaloMilis = TimeUnit.MINUTES.toMillis(planta.minutosEntreRiegos.toLong())
+                val proximoRiegoEsperado = planta.fechaUltimoRiego + intervaloMilis
+                val retrasoMilis = (ahora - proximoRiegoEsperado).coerceAtLeast(0L)
+                var saludActual = planta.salud
+
+                if (retrasoMilis > 0 && planta.fechaUltimoRiego != 0L) {
+                    // Penalizar 1 punto de salud por cada 12 horas de retraso
+                    val horasDeRetraso = TimeUnit.MILLISECONDS.toHours(retrasoMilis)
+                    val saludPerdida = (horasDeRetraso / 12).toInt()
+                    saludActual = (planta.salud - saludPerdida).coerceAtLeast(0)
+                }
+
+                // --- 3. RECUPERACIÓN DE VITALIDAD CON EL RIEGO ---
+                // Si estaba crítica, recupera más. Si estaba bien, recupera un poco.
+                val recuperacion = if (progreso < 0.2f) 25 else 10
+                val saludFinal = (saludActual + recuperacion).coerceAtMost(100)
+
+                // --- 4. ACTUALIZACIÓN FINAL DE LA PLANTA ---
                 ejecutarEfectosRiego(esExceso = false)
-                val mejora = if (progreso < 0.20f) 12 else 5
-                val saludFinal = (planta.salud + mejora).coerceAtMost(100)
                 val plantaActualizada = planta.copy(
                     fechaUltimoRiego = ahora,
                     salud = saludFinal,
-                    vecesSobreregada = 0
+                    vecesSobreregada = 0 // Reset counter on correct watering
                 )
 
                 plantaDao.insertarEventoRiego(
-                    RiegoEvento(plantaId = planta.id, fecha = ahora, fuePuntual = true, esSobrerego = false)
+                    RiegoEvento(plantaId = planta.id, fecha = ahora, fuePuntual = progreso >= 0.2f, esSobrerego = false)
                 )
                 plantaDao.insertPlanta(plantaActualizada)
                 programarNotificacion(plantaActualizada)
@@ -96,7 +122,7 @@ class PlantaViewModel(application: Application) : AndroidViewModel(application) 
                     nombre = nombre,
                     especie = especie,
                     consejo = consejo,
-                    diasEntreRiegos = if (totalMinutos <= 0) 1 else totalMinutos,
+                    minutosEntreRiegos = if (totalMinutos <= 0) 1 else totalMinutos,
                     fechaUltimoRiego = 0L,
                     imagenUri = rutaImagen,
                     salud = 100
@@ -114,7 +140,7 @@ class PlantaViewModel(application: Application) : AndroidViewModel(application) 
                 val plantaActualizada = plantaOriginal.copy(
                     nombre = nuevoNombre,
                     especie = nuevaEspecie,
-                    diasEntreRiegos = nuevosMinutos,
+                    minutosEntreRiegos = nuevosMinutos,
                     imagenUri = nuevaImagen
                 )
                 plantaDao.insertPlanta(plantaActualizada)

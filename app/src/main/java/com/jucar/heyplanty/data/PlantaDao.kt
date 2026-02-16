@@ -22,7 +22,7 @@ interface PlantaDao {
     @Insert
     suspend fun insertarEventoRiego(evento: RiegoEvento)
 
-    @Query("SELECT * FROM historial_riego WHERE plantaId = :plantaId ORDER BY fecha DESC LIMIT 5")
+    @Query("SELECT * FROM historial_riego WHERE plantaId = :plantaId ORDER BY fecha DESC")
     fun getHistorialPorPlanta(plantaId: String): Flow<List<RiegoEvento>>
 
     @Query("DELETE FROM historial_riego WHERE plantaId = :plantaId")

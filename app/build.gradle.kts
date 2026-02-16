@@ -38,6 +38,9 @@ android {
     buildFeatures {
         compose = true
     }
+    aaptOptions {
+        noCompress.add("tflite")
+    }
 }
 
 dependencies {
@@ -54,6 +57,22 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
     implementation("androidx.compose.material:material-icons-extended")
+
+    // --- DEPENDENCIAS PARA NAVEGACIÓN Y CÁMARA ---
+    val navVersion = "2.7.7"
+    val cameraVersion = "1.3.4"
+    implementation("androidx.navigation:navigation-compose:$navVersion")
+    implementation("androidx.camera:camera-core:$cameraVersion")
+    implementation("androidx.camera:camera-camera2:$cameraVersion")
+    implementation("androidx.camera:camera-lifecycle:$cameraVersion")
+    implementation("androidx.camera:camera-view:$cameraVersion")
+    // ------------------------------------------
+
+    // --- SECCIÓN DE INTELIGENCIA ARTIFICIAL (TENSORFLOW LITE) ---
+    implementation("org.tensorflow:tensorflow-lite-task-vision:0.4.4")
+    // Opcional: Para aceleración por GPU, descomentar si es necesario más adelante
+    // implementation("org.tensorflow:tensorflow-lite-gpu:2.9.0")
+    // -----------------------------------------------------------
 
     // --- SECCIÓN DE ROOM AGREGADA ---
     val roomVersion = "2.6.1"
