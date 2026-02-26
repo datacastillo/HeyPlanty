@@ -40,6 +40,7 @@ import com.jucar.heyplanty.domain.Planta
 import com.jucar.heyplanty.screens.CameraScreen
 import com.jucar.heyplanty.screens.HomeScreen
 import com.jucar.heyplanty.ui.theme.HeyPlantyTheme
+import com.jucar.heyplanty.worker.WateringWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -69,6 +70,8 @@ class MainActivity : ComponentActivity(), PlantClassifier.ClassificationListener
     ) { isGranted: Boolean ->
         if (isGranted) {
             Log.d("HeyPlanty", "Permiso de notificaciones concedido")
+            // Una vez concedido el permiso, programamos el worker
+            WateringWorker.schedule(this)
         } else {
             Log.d("HeyPlanty", "Permiso de notificaciones denegado")
         }
@@ -80,6 +83,9 @@ class MainActivity : ComponentActivity(), PlantClassifier.ClassificationListener
         plantClassifier = PlantClassifier(this, this)
 
         pedirPermisos()
+        
+        // Programar el worker de riego al iniciar
+        WateringWorker.schedule(this)
 
         enableEdgeToEdge()
         setContent {
@@ -131,13 +137,18 @@ class MainActivity : ComponentActivity(), PlantClassifier.ClassificationListener
     private fun guardarPlanta(nombre: String, imagenUri: String) {
         lifecycleScope.launch {
             withContext(Dispatchers.IO) {
+                // Al identificar por IA, asignamos valores por defecto sensatos 
+                // para que el sistema de riego empiece a funcionar.
+                // Idealmente esto abriría el diálogo de edición después.
                 database.plantaDao().insertPlanta(
                     Planta(
                         nombre = nombre,
                         especie = nombre,
-                        minutosEntreRiegos = 0,
-                        fechaUltimoRiego = 0L,
-                        imagenUri = imagenUri
+                        minutosEntreRiegos = 10080, // 7 días por defecto
+                        fechaUltimoRiego = System.currentTimeMillis(),
+                        imagenUri = imagenUri,
+                        consejo = "¡Has identificado una $nombre! Asegúrate de ajustar sus cuidados en la ficha.",
+                        salud = 100
                     )
                 )
             }

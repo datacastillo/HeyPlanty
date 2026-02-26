@@ -174,7 +174,6 @@ fun IdentitySection(
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(Modifier.height(16.dp))
         
-        // Foto Circular Premium
         Box(
             modifier = Modifier.size(130.dp).shadow(16.dp, RoundedCornerShape(48.dp)).clip(RoundedCornerShape(48.dp)).background(Color.White).clickable(onClick = onImageClick),
             contentAlignment = Alignment.Center
@@ -191,7 +190,7 @@ fun IdentitySection(
 
         Spacer(Modifier.height(32.dp))
 
-        // --- CAMPO NOMBRE CON CARRUSEL QUE APARECE ANTES DE OPRIMIR ---
+        // --- CAMPO NOMBRE CON CARRUSEL PROACTIVO EN EL LABEL ---
         var isNameFocused by remember { mutableStateOf(false) }
         val suggestedNames = listOf("Confi", "Verdiz", "Esperanza", "Bebé", "Clorofila", "Jade")
         var nIdx by remember { mutableIntStateOf(0) }
@@ -226,7 +225,7 @@ fun IdentitySection(
 
         Spacer(Modifier.height(28.dp))
 
-        // --- SELECCIÓN DE PLANTA (ÉLITE CON FORMATO MEJORADO) ---
+        // --- SELECCIÓN DE PLANTA (ELITE) ---
         Text("¿Qué planta es?", style = TextStyle(fontWeight = FontWeight.Black, fontSize = 20.sp, color = PlantDark), modifier = Modifier.align(Alignment.Start))
         Spacer(Modifier.height(12.dp))
         
@@ -241,7 +240,6 @@ fun IdentitySection(
         
         Spacer(Modifier.height(16.dp))
         
-        // Tarjetas Visuales de Sugerencias (Formato Élite)
         Column(modifier = Modifier.fillMaxWidth()) {
             Text("Sugerencias populares", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
             Spacer(Modifier.height(10.dp))
@@ -254,9 +252,7 @@ fun IdentitySection(
                         shape = RoundedCornerShape(16.dp),
                         color = if (isSelected) PlantPrimary else Color.White,
                         border = BorderStroke(1.dp, if (isSelected) PlantPrimary else Color.LightGray.copy(0.4f)),
-                        modifier = Modifier
-                            .animateContentSize()
-                            .shadow(if (isSelected) 12.dp else 4.dp, RoundedCornerShape(16.dp))
+                        modifier = Modifier.animateContentSize().shadow(if (isSelected) 12.dp else 4.dp, RoundedCornerShape(16.dp))
                     ) {
                         Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text(item.icon, fontSize = 20.sp)
@@ -280,24 +276,17 @@ fun CareSection(
 ) {
     Text("Configurar Cuidados", style = TextStyle(fontWeight = FontWeight.Black, fontSize = 24.sp, color = PlantDark))
     Text("Define el ritmo perfecto para su salud.", fontSize = 14.sp, color = Color.Gray)
-    
     Spacer(Modifier.height(28.dp))
-    
-    // --- RUEDA DE RIEGO (WHEEL PICKER) ---
     Text("Intervalo de Riego", fontWeight = FontWeight.Bold, color = PlantDark, fontSize = 16.sp)
     Spacer(Modifier.height(12.dp))
-    
     WateringWheelPicker(d, h, m, onTimeChange)
-    
     Spacer(Modifier.height(32.dp))
-    
     CareAdjustmentCard("Iluminación Ideal", Icons.Rounded.WbSunny, luz) {
         setLuz(when(luz) { "Luz Indirecta" -> "Luz Directa" "Luz Directa" -> "Sombra" else -> "Luz Indirecta" })
     }
     CareAdjustmentCard("Tipo de Sustrato", Icons.Rounded.Grass, suelo) {
         setSuelo(when(suelo) { "Universal Premium" -> "Drenante" "Drenante" -> "Orgánico" else -> "Universal Premium" })
     }
-
     Spacer(Modifier.height(20.dp))
     OutlinedTextField(
         value = notas, onValueChange = onNotasChange,
@@ -324,7 +313,6 @@ fun WateringWheelPicker(d: Int, h: Int, m: Int, onValueChange: (Int, Int, Int) -
 fun RowScope.TimeWheelColumn(label: String, range: IntRange, current: Int, onSelect: (Int) -> Unit) {
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = range.indexOf(current))
     val snapBehavior = rememberSnapFlingBehavior(lazyListState = listState)
-    
     LaunchedEffect(listState.isScrollInProgress) {
         if (!listState.isScrollInProgress) {
             val centerIndex = listState.firstVisibleItemIndex
@@ -333,7 +321,6 @@ fun RowScope.TimeWheelColumn(label: String, range: IntRange, current: Int, onSel
             }
         }
     }
-
     Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
         Text(label, fontSize = 11.sp, fontWeight = FontWeight.Black, color = PlantPrimary)
         Box(modifier = Modifier.height(100.dp)) {

@@ -1,6 +1,7 @@
-
 package com.jucar.heyplanty.screens
 
+import android.content.Context
+import android.hardware.*
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
@@ -18,6 +19,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
@@ -26,6 +28,7 @@ import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -58,20 +61,23 @@ val PlantAccent = Color(0xFFC8E6C9)
 val DangerRed = Color(0xFFD32F2F)
 val WarningOrange = Color(0xFFFF9800)
 val DeepGray = Color(0xFF455A64)
-val SicklyYellow = Color(0xFFFBC02D) // Color para plantas enfermas
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(navController: NavController, viewModel: PlantaViewModel = viewModel()) {
     var showDialog by remember { mutableStateOf(false) }
     var plantaAEditar by remember { mutableStateOf<Planta?>(null) }
-    var plantaParaHistorial by remember { mutableStateOf<Planta?>(null) } // State for the history sheet
+    var plantaParaHistorial by remember { mutableStateOf<Planta?>(null) }
     var searchText by remember { mutableStateOf("") }
     var isSearching by remember { mutableStateOf(false) }
     var tiempoActual by remember { mutableLongStateOf(System.currentTimeMillis()) }
 
     var showExcesoDialog by remember { mutableStateOf(false) }
     var ultimoResultadoRiego by remember { mutableStateOf<RiegoResult?>(null) }
+
+    // Estados para el Luxómetro
+    var showLightMeter by remember { mutableStateOf(false) }
+    var targetLightForMeter by remember { mutableStateOf("") }
 
     val misPlantas by viewModel.todasLasPlantas.collectAsState(initial = emptyList())
     val snackbarHostState = remember { SnackbarHostState() }
@@ -144,7 +150,7 @@ fun HomeScreen(navController: NavController, viewModel: PlantaViewModel = viewMo
                         verticalArrangement = Arrangement.spacedBy(22.dp)
                     ) {
                         items(plantasFiltradas, key = { it.id }) { planta ->
-                            key(tiempoActual) { // Forzar recomposición por tiempo
+                            key(tiempoActual) {
                                 PlantCardWrapper(onDelete = { viewModel.eliminarPlanta(planta) }) {
                                     PlantItemElite(
                                         planta = planta,
@@ -173,10 +179,20 @@ fun HomeScreen(navController: NavController, viewModel: PlantaViewModel = viewMo
                 onDelete = {
                     viewModel.eliminarPlanta(plantaParaHistorial!!)
                     plantaParaHistorial = null
+                },
+                onMeasureLight = { target ->
+                    targetLightForMeter = target
+                    showLightMeter = true
                 }
             )
         }
 
+        if (showLightMeter) {
+            LightMeterDialog(
+                targetLight = targetLightForMeter,
+                onDismiss = { showLightMeter = false }
+            )
+        }
 
         if (showExcesoDialog && ultimoResultadoRiego != null) {
             ExcesoRiegoDialog(
@@ -215,49 +231,169 @@ fun PlantHistorySheet(
     viewModel: PlantaViewModel,
     onDismiss: () -> Unit,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onMeasureLight: (String) -> Unit
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(),
-        containerColor = Color(0xFFFBFDFA)
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = Color.White,
+        dragHandle = { BottomSheetDefaults.DragHandle(color = Color.LightGray.copy(0.5f)) }
     ) {
-        Column(modifier = Modifier.padding(horizontal = 24.dp).padding(bottom = 32.dp)) {
-            Text(
-                planta.nombre,
-                style = TextStyle(fontWeight = FontWeight.Black, fontSize = 28.sp, color = PlantDark),
-                modifier = Modifier.padding(bottom = 4.dp)
-            )
-            Text(
-                planta.especie,
-                style = TextStyle(fontWeight = FontWeight.Medium, fontSize = 16.sp, color = DeepGray)
-            )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 40.dp)
+        ) {
+            // --- SECCIÓN HERO PRO ---
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                AsyncImage(
+                    model = planta.imagenUri ?: R.drawable.ic_launcher_background,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(110.dp)
+                        .shadow(16.dp, RoundedCornerShape(32.dp))
+                        .clip(RoundedCornerShape(32.dp))
+                        .background(PlantLight),
+                    contentScale = ContentScale.Crop
+                )
+                Spacer(Modifier.width(20.dp))
+                Column {
+                    Text(
+                        planta.nombre,
+                        style = TextStyle(fontWeight = FontWeight.Black, fontSize = 30.sp, color = PlantDark, letterSpacing = (-1).sp)
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            planta.especie,
+                            style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 14.sp, color = PlantPrimary)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        val dificultad = when {
+                            planta.nivelDrama >= 4 -> "Experto"
+                            planta.nivelDrama >= 2 -> "Intermedio"
+                            else -> "Principiante"
+                        }
+                        Surface(color = PlantAccent.copy(0.4f), shape = CircleShape) {
+                            Text(dificultad, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = PlantDark)
+                        }
+                    }
+                }
+            }
 
+            Spacer(Modifier.height(32.dp))
+
+            // --- SEGURIDAD PARA MASCOTAS ---
+            val esToxica = listOf("Monstera", "Sansevieria", "Ficus", "Pothos", "Aloe").any { planta.especie.contains(it, true) }
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = if (esToxica) Color(0xFFFFEBEE) else Color(0xFFF1F8E9),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        if (esToxica) Icons.Rounded.Warning else Icons.Rounded.Pets,
+                        null,
+                        tint = if (esToxica) DangerRed else PlantPrimary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        if (esToxica) "Tóxica para mascotas" else "Segura para mascotas",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (esToxica) DangerRed else PlantDark
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(32.dp))
+
+            // --- DASHBOARD DE VITALIDAD ---
+            Text("Estado Vital", fontWeight = FontWeight.Black, fontSize = 18.sp, color = PlantDark)
+            Spacer(Modifier.height(16.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                MetricCard(Modifier.weight(1f), Icons.Rounded.Favorite, "Salud", "${planta.salud}%", if (planta.salud > 50) PlantPrimary else DangerRed)
+                MetricCard(Modifier.weight(1f), Icons.Rounded.TheaterComedy, "Drama", "${planta.nivelDrama}/5", if (planta.nivelDrama > 3) WarningOrange else PlantPrimary)
+                MetricCard(Modifier.weight(1f), Icons.Rounded.WaterDrop, "Riego", formatMinutes(planta.minutosEntreRiegos), Color(0xFF3C83D4))
+            }
+
+            Spacer(Modifier.height(32.dp))
+
+            // --- GUÍA DE CUIDADOS ---
+            Text("Guía de Cuidados", fontWeight = FontWeight.Black, fontSize = 18.sp, color = PlantDark)
+            Spacer(Modifier.height(12.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                RequirementItem(
+                    Modifier.weight(1f),
+                    Icons.Rounded.WbSunny,
+                    "Luz",
+                    planta.tipoDeLuz.ifEmpty { "Indirecta" },
+                    onClick = { onMeasureLight(planta.tipoDeLuz.ifEmpty { "Indirecta" }) }
+                )
+                RequirementItem(Modifier.weight(1f), Icons.Rounded.Grass, "Suelo", planta.tipoDeSuelo.ifEmpty { "Universal" })
+            }
+
+            // --- CONSEJO DEL EXPERTO ---
+            if (planta.consejo.isNotBlank()) {
+                Spacer(Modifier.height(32.dp))
+                Text("Consejo del Experto", fontWeight = FontWeight.Black, fontSize = 18.sp, color = PlantDark)
+                Surface(
+                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                    color = Color(0xFFFFF9C4),
+                    shape = RoundedCornerShape(topEnd = 24.dp, bottomStart = 24.dp, bottomEnd = 24.dp)
+                ) {
+                    Row(Modifier.padding(20.dp), verticalAlignment = Alignment.Top) {
+                        Icon(Icons.Rounded.TipsAndUpdates, null, tint = WarningOrange, modifier = Modifier.size(24.dp))
+                        Spacer(Modifier.width(16.dp))
+                        Text(
+                            planta.consejo,
+                            style = TextStyle(fontSize = 14.sp, color = PlantDark, fontWeight = FontWeight.Medium, lineHeight = 20.sp)
+                        )
+                    }
+                }
+            }
+
+            // --- TUS NOTAS ---
+            if (planta.notas.isNotBlank()) {
+                Spacer(Modifier.height(32.dp))
+                Text("Tus Notas", fontWeight = FontWeight.Black, fontSize = 18.sp, color = PlantDark)
+                Text(
+                    planta.notas,
+                    modifier = Modifier.padding(top = 8.dp).alpha(0.8f),
+                    style = TextStyle(fontSize = 15.sp, color = DeepGray, lineHeight = 22.sp)
+                )
+            }
+
+            Spacer(Modifier.height(32.dp))
+
+            // --- HISTORIAL ---
+            Text("Historial Reciente", fontWeight = FontWeight.Black, fontSize = 18.sp, color = PlantDark)
+            Spacer(Modifier.height(12.dp))
             EliteDetailsSection(planta, viewModel)
 
+            // --- ACCIONES ---
             Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = 40.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Button(
                     onClick = onEdit,
-                    modifier = Modifier.weight(1f).height(50.dp),
+                    modifier = Modifier.weight(1f).height(56.dp),
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = PlantAccent, contentColor = PlantDark)
                 ) {
-                    Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(20.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Editar", fontWeight = FontWeight.Bold)
+                    Icon(Icons.Default.Edit, null, Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Editar", fontWeight = FontWeight.Black)
                 }
-                OutlinedButton(
+                IconButton(
                     onClick = onDelete,
-                    modifier = Modifier.weight(1f).height(50.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(1.5.dp, DangerRed)
+                    modifier = Modifier.size(56.dp).background(DangerRed.copy(0.1f), RoundedCornerShape(16.dp))
                 ) {
-                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(20.dp), tint = DangerRed)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Eliminar", fontWeight = FontWeight.Bold, color = DangerRed)
+                    Icon(Icons.Default.Delete, null, tint = DangerRed)
                 }
             }
         }
@@ -267,84 +403,62 @@ fun PlantHistorySheet(
 @Composable
 fun EliteDetailsSection(planta: Planta, viewModel: PlantaViewModel) {
     val historial by viewModel.obtenerHistorial(planta.id).collectAsState(initial = emptyList())
-
     Column {
-        // --- MÉTRICAS VITALES ---
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 16.dp),
-            horizontalArrangement = Arrangement.SpaceAround,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            MetricItem(
-                icon = Icons.Rounded.Favorite,
-                label = "Vitalidad",
-                value = "${planta.salud}%",
-                color = when {
-                    planta.salud > 70 -> PlantPrimary
-                    planta.salud > 40 -> WarningOrange
-                    else -> DangerRed
-                }
-            )
-            MetricItem(
-                icon = Icons.Rounded.TheaterComedy,
-                label = "Drama",
-                value = "${planta.nivelDrama}/5",
-                color = DeepGray
-            )
-            MetricItem(
-                icon = Icons.Rounded.WaterDrop,
-                label = "Riego",
-                value = formatMinutes(planta.minutosEntreRiegos),
-                color = Color(0xFF3C83D4)
-            )
-        }
-
-        // --- HISTORIAL DE RIEGO ---
-        Text(
-            "Historial de Cuidado",
-            style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 18.sp, color = PlantDark),
-            modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
-        )
-
         if (historial.isEmpty()) {
-            Text(
-                "Aún no hay registros de riego para ${planta.nombre}.",
-                style = TextStyle(color = DeepGray.copy(alpha = 0.8f)),
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp)
-            )
+            Text("Aún no hay registros de riego.", style = TextStyle(color = Color.Gray), modifier = Modifier.padding(vertical = 16.dp))
         } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxWidth().heightIn(max = 200.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(historial.sortedByDescending { it.fecha }) { evento ->
-                    HistoryItem(evento)
-                }
+            historial.sortedByDescending { it.fecha }.take(5).forEach { evento ->
+                HistoryItem(evento)
+                Spacer(Modifier.height(8.dp))
             }
         }
     }
 }
 
 @Composable
-fun MetricItem(icon: ImageVector, label: String, value: String, color: Color) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(28.dp))
-        Spacer(Modifier.height(4.dp))
-        Text(value, style = TextStyle(fontWeight = FontWeight.Black, fontSize = 16.sp, color = PlantDark))
-        Text(label, style = TextStyle(fontSize = 12.sp, color = DeepGray.copy(alpha = 0.8f)))
+fun MetricCard(modifier: Modifier, icon: ImageVector, label: String, value: String, color: Color) {
+    Surface(
+        modifier = modifier.shadow(6.dp, RoundedCornerShape(20.dp)),
+        color = Color.White,
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, color.copy(alpha = 0.15f))
+    ) {
+        Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(icon, null, tint = color, modifier = Modifier.size(24.dp))
+            Spacer(Modifier.height(8.dp))
+            Text(value, fontWeight = FontWeight.Black, fontSize = 15.sp, color = PlantDark)
+            Text(label, fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+fun RequirementItem(modifier: Modifier, icon: ImageVector, label: String, value: String, onClick: (() -> Unit)? = null) {
+    Row(
+        modifier = modifier
+            .background(PlantLight.copy(0.5f), RoundedCornerShape(16.dp))
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(Modifier.size(32.dp).clip(CircleShape).background(Color.White), contentAlignment = Alignment.Center) {
+            Icon(icon, null, tint = PlantPrimary, modifier = Modifier.size(18.dp))
+        }
+        Spacer(Modifier.width(12.dp))
+        Column {
+            Text(label, fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+            Text(value, fontSize = 12.sp, fontWeight = FontWeight.Black, color = PlantDark)
+        }
     }
 }
 
 fun formatMinutes(totalMinutes: Int): String {
     val days = totalMinutes / (24 * 60)
     val hours = (totalMinutes % (24 * 60)) / 60
-    val minutes = totalMinutes % 60
-
     return when {
         days > 0 -> "${days}d ${hours}h"
-        hours > 0 -> "${hours}h ${minutes}m"
-        else -> "${minutes}m"
+        hours > 0 -> "${hours}h"
+        else -> "${totalMinutes}m"
     }
 }
 
@@ -352,10 +466,7 @@ fun formatMinutes(totalMinutes: Int): String {
 fun HistoryItem(evento: RiegoEvento) {
     val dateFormat = remember { SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault()) }
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(PlantAccent.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+        modifier = Modifier.fillMaxWidth().background(PlantLight.copy(0.3f), RoundedCornerShape(12.dp)).padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
@@ -364,7 +475,7 @@ fun HistoryItem(evento: RiegoEvento) {
                 imageVector = when {
                     evento.esSobrerego -> Icons.Rounded.Waves
                     evento.fuePuntual -> Icons.Rounded.CheckCircle
-                    else -> Icons.Rounded.Warning
+                    else -> Icons.Rounded.History
                 },
                 contentDescription = null,
                 tint = when {
@@ -372,69 +483,43 @@ fun HistoryItem(evento: RiegoEvento) {
                     evento.fuePuntual -> PlantPrimary
                     else -> DangerRed
                 },
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(18.dp)
             )
             Spacer(Modifier.width(12.dp))
-            Text(
-                text = dateFormat.format(Date(evento.fecha)),
-                style = TextStyle(fontWeight = FontWeight.Medium, fontSize = 14.sp, color = PlantDark)
-            )
+            Text(dateFormat.format(Date(evento.fecha)), fontSize = 14.sp, fontWeight = FontWeight.Medium, color = PlantDark)
         }
         Text(
-            text = when {
-                evento.esSobrerego -> "Sobrerego"
-                evento.fuePuntual -> "A tiempo"
-                else -> "Con retraso"
-            },
-            style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 12.sp, color = DeepGray)
+            if (evento.esSobrerego) "Sobrerego" else if (evento.fuePuntual) "Perfecto" else "Tarde",
+            fontSize = 11.sp, fontWeight = FontWeight.Black, color = Color.Gray
         )
     }
 }
 
 @Composable
 fun ExcesoRiegoDialog(resultado: RiegoResult, onDismiss: () -> Unit) {
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Card(
             shape = RoundedCornerShape(32.dp),
             colors = CardDefaults.cardColors(containerColor = Color.White),
-            modifier = Modifier.fillMaxWidth(0.85f).padding(16.dp).shadow(30.dp, RoundedCornerShape(32.dp))
+            modifier = Modifier.fillMaxWidth(0.85f).padding(16.dp)
         ) {
-            Column(
-                modifier = Modifier.background(
-                    Brush.verticalGradient(listOf(Color.White, PlantLight.copy(alpha = 0.5f)))
-                ).padding(28.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Box(
-                    modifier = Modifier.size(80.dp).background(
-                        if (resultado.esExceso) WarningOrange.copy(0.1f) else PlantPrimary.copy(0.1f),
-                        CircleShape
-                    ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = if (resultado.esExceso) Icons.Rounded.Waves else Icons.Rounded.CheckCircle,
-                        contentDescription = null,
-                        tint = if (resultado.esExceso) WarningOrange else PlantPrimary,
-                        modifier = Modifier.size(40.dp)
-                    )
-                }
+            Column(modifier = Modifier.padding(28.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    if (resultado.esExceso) Icons.Rounded.Waves else Icons.Rounded.CheckCircle,
+                    null,
+                    tint = if (resultado.esExceso) WarningOrange else PlantPrimary,
+                    modifier = Modifier.size(60.dp)
+                )
                 Spacer(Modifier.height(24.dp))
-                Text("Aviso de Cuidado", style = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Bold, color = if (resultado.esExceso) WarningOrange else PlantPrimary, letterSpacing = 1.sp))
-                Spacer(Modifier.height(8.dp))
-                Text(resultado.mensaje, style = TextStyle(color = PlantDark, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center, lineHeight = 24.sp))
+                Text(resultado.mensaje, style = TextStyle(color = PlantDark, fontSize = 18.sp, fontWeight = FontWeight.Black, textAlign = TextAlign.Center))
                 Spacer(Modifier.height(32.dp))
                 Button(
                     onClick = onDismiss,
                     colors = ButtonDefaults.buttonColors(containerColor = if (resultado.esExceso) WarningOrange else PlantPrimary),
                     shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.fillMaxWidth().height(54.dp),
-                    elevation = ButtonDefaults.buttonElevation(8.dp)
+                    modifier = Modifier.fillMaxWidth().height(54.dp)
                 ) {
-                    Text("ENTENDIDO", style = TextStyle(fontWeight = FontWeight.Black, fontSize = 15.sp, letterSpacing = 1.sp))
+                    Text("ENTENDIDO", fontWeight = FontWeight.Black)
                 }
             }
         }
@@ -445,7 +530,6 @@ fun ExcesoRiegoDialog(resultado: RiegoResult, onDismiss: () -> Unit) {
 fun PremiumBackgroundEffect() {
     Canvas(modifier = Modifier.fillMaxSize()) {
         drawCircle(brush = Brush.radialGradient(colors = listOf(PlantAccent.copy(alpha = 0.4f), Color.Transparent), center = Offset(size.width * 0.9f, size.height * 0.1f), radius = 400.dp.toPx()))
-        drawCircle(brush = Brush.radialGradient(colors = listOf(Color(0xFFE1F5FE).copy(alpha = 0.5f), Color.Transparent), center = Offset(size.width * 0.1f, size.height * 0.9f), radius = 600.dp.toPx()))
     }
 }
 
@@ -456,10 +540,7 @@ fun EliteTopAppBar(isSearching: Boolean, onToggleSearch: () -> Unit) {
         colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.Transparent),
         title = { Text("HEYPLANTY", style = TextStyle(fontWeight = FontWeight.Black, fontSize = 15.sp, letterSpacing = 5.sp, brush = Brush.horizontalGradient(listOf(PlantDark, PlantPrimary)))) },
         actions = {
-            IconButton(
-                onClick = onToggleSearch,
-                modifier = Modifier.padding(end = 12.dp).size(42.dp).background(Color.White.copy(0.7f), CircleShape).border(0.5.dp, PlantAccent, CircleShape)
-            ) {
+            IconButton(onClick = onToggleSearch, modifier = Modifier.padding(end = 12.dp).size(42.dp).background(Color.White.copy(0.7f), CircleShape).border(0.5.dp, PlantAccent, CircleShape)) {
                 Icon(if (isSearching) Icons.Default.Close else Icons.Default.Search, null, tint = PlantDark, modifier = Modifier.size(20.dp))
             }
         }
@@ -469,28 +550,19 @@ fun EliteTopAppBar(isSearching: Boolean, onToggleSearch: () -> Unit) {
 @Composable
 fun HeaderBrandingSection(misPlantas: List<Planta>, isSearching: Boolean) {
     val transitionState = remember { MutableTransitionState(false) }.apply { targetState = !isSearching }
-
-    AnimatedVisibility(
-        visibleState = transitionState,
-        enter = fadeIn(tween(600)) + slideInHorizontally(tween(600)),
-        exit = fadeOut(tween(300)) + slideOutHorizontally()
-    ) {
-        val horaActual = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-        val (saludoTop, saludoBottom, subtexto) = when(horaActual) {
-            in 5..11 -> Triple("Despierta,", "Buen día", "Tus brotes buscan el sol")
-            in 12..18 -> Triple("Luz vital,", "Buenas tardes", "Momento de frescura en el jardín")
-            in 19..23 -> Triple("Calma,", "Buenas noches", "Tus raíces descansan hoy")
-            else -> Triple("Silencio,", "Hola noctámbulo", "El jardín sueña bajo la luna")
+    AnimatedVisibility(visibleState = transitionState, enter = fadeIn() + slideInHorizontally(), exit = fadeOut() + slideOutHorizontally()) {
+        val hora = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+        val saludo = when(hora) {
+            in 5..11 -> "Buen día"
+            in 12..18 -> "Buenas tardes"
+            else -> "Buenas noches"
         }
-
         val necesitanAgua = misPlantas.count { it.obtenerProgresoRiego() <= 0f && it.fechaUltimoRiego > 0L }
-
         Column(modifier = Modifier.padding(horizontal = 26.dp, vertical = 12.dp)) {
             Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(saludoTop, style = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.Medium, color = PlantPrimary, letterSpacing = 1.sp))
-                    Text(saludoBottom, style = TextStyle(fontSize = 34.sp, fontWeight = FontWeight.Black, color = Color(0xFF1B301B), letterSpacing = (-1.5).sp, lineHeight = 36.sp))
-                    Text(subtexto, style = TextStyle(fontSize = 13.sp, color = DeepGray.copy(alpha = 0.7f), fontWeight = FontWeight.Medium))
+                    Text("Hey,", style = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.Medium, color = PlantPrimary))
+                    Text(saludo, style = TextStyle(fontSize = 34.sp, fontWeight = FontWeight.Black, color = Color(0xFF1B301B), letterSpacing = (-1.5).sp))
                 }
                 StatusGlassCard(necesitanAgua)
             }
@@ -502,24 +574,17 @@ fun HeaderBrandingSection(misPlantas: List<Planta>, isSearching: Boolean) {
 
 @Composable
 fun StatusGlassCard(necesitanAgua: Int) {
-    val infiniteTransition = rememberInfiniteTransition("pulse")
-    val alphaAnim by infiniteTransition.animateFloat(
-        initialValue = 0.5f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(1200), RepeatMode.Reverse), label = "alpha"
-    )
-
     Surface(
         color = if (necesitanAgua > 0) DangerRed.copy(0.08f) else PlantPrimary.copy(0.08f),
         shape = RoundedCornerShape(24.dp),
-        border = BorderStroke(1.5.dp, if (necesitanAgua > 0) DangerRed.copy(0.15f) else PlantPrimary.copy(0.15f)),
-        modifier = Modifier.shadow(if (necesitanAgua > 0) 8.dp else 0.dp, RoundedCornerShape(24.dp))
+        border = BorderStroke(1.5.dp, if (necesitanAgua > 0) DangerRed.copy(0.15f) else PlantPrimary.copy(0.15f))
     ) {
         Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(10.dp).graphicsLayer(alpha = if (necesitanAgua > 0) alphaAnim else 1f).background(if (necesitanAgua > 0) DangerRed else PlantPrimary, CircleShape))
+            Box(Modifier.size(10.dp).background(if (necesitanAgua > 0) DangerRed else PlantPrimary, CircleShape))
             Spacer(Modifier.width(10.dp))
             Column {
                 Text(if (necesitanAgua > 0) "$necesitanAgua con sed" else "Todo OK", style = TextStyle(fontWeight = FontWeight.ExtraBold, fontSize = 13.sp, color = if (necesitanAgua > 0) DangerRed else PlantDark))
-                Text(if (necesitanAgua > 0) "¡A regar!" else "Jardín feliz", style = TextStyle(fontSize = 9.sp, fontWeight = FontWeight.SemiBold, color = DeepGray))
+                Text(if (necesitanAgua > 0) "¡Riega ya!" else "Jardín feliz", style = TextStyle(fontSize = 9.sp, fontWeight = FontWeight.SemiBold, color = DeepGray))
             }
         }
     }
@@ -527,19 +592,13 @@ fun StatusGlassCard(necesitanAgua: Int) {
 
 @Composable
 fun SearchSection(isVisible: Boolean, searchText: String, onValueChange: (String) -> Unit) {
-    AnimatedVisibility(visible = isVisible, enter = slideInVertically() + expandVertically() + fadeIn(), exit = slideOutVertically() + shrinkVertically() + fadeOut()) {
+    AnimatedVisibility(visible = isVisible, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
         TextField(
             value = searchText, onValueChange = onValueChange,
-            placeholder = { Text("Buscar por nombre...", color = DeepGray.copy(0.5f)) },
+            placeholder = { Text("Buscar planta...", color = Color.Gray) },
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
             shape = RoundedCornerShape(16.dp),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = PlantAccent.copy(0.5f),
-                unfocusedContainerColor = PlantAccent.copy(0.3f),
-                disabledContainerColor = PlantLight,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent
-            ),
+            colors = TextFieldDefaults.colors(focusedContainerColor = PlantAccent.copy(0.3f), unfocusedContainerColor = PlantAccent.copy(0.1f), focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent),
             leadingIcon = { Icon(Icons.Default.Search, null, tint = PlantPrimary) }
         )
     }
@@ -547,239 +606,160 @@ fun SearchSection(isVisible: Boolean, searchText: String, onValueChange: (String
 
 @Composable
 fun EmptyGardenIllustration() {
-    Column(
-        Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Icon(Icons.Rounded.NaturePeople, contentDescription = null, tint = PlantAccent, modifier = Modifier.size(120.dp))
-        Text("Tu jardín está vacío", style = MaterialTheme.typography.headlineSmall, color = PlantDark, fontWeight = FontWeight.Bold)
-        Text("Añade tu primera planta para empezar a cuidarla", style = MaterialTheme.typography.bodyMedium, color = DeepGray, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 32.dp))
+    Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+        Icon(Icons.Rounded.NaturePeople, null, tint = PlantAccent, modifier = Modifier.size(120.dp))
+        Text("Tu jardín está vacío", fontSize = 20.sp, color = PlantDark, fontWeight = FontWeight.Bold)
     }
 }
 
-
 @Composable
-fun PlantCardWrapper(
-    onDelete: () -> Unit,
-    content: @Composable () -> Unit
-) {
+fun PlantCardWrapper(onDelete: () -> Unit, content: @Composable () -> Unit) {
     var offsetX by remember { mutableFloatStateOf(0f) }
-    val coroutineScope = rememberCoroutineScope()
-
-    val dismissThreshold = -250f
-
-    Box(
-        modifier = Modifier
-            .pointerInput(Unit) {
-                detectHorizontalDragGestures(
-                    onHorizontalDrag = { change, dragAmount ->
-                        offsetX += dragAmount
-                        change.consume()
-                    },
-                    onDragEnd = {
-                        if (offsetX < dismissThreshold) {
-                            onDelete()
-                        }
-                        coroutineScope.launch {
-                            animate(0f, offsetX) { value, _ -> offsetX = value }
-                        }
-                    }
-                )
-            }
-            .offset { IntOffset(offsetX.roundToInt(), 0) }
-    ) {
-        content()
-    }
+    val scope = rememberCoroutineScope()
+    Box(modifier = Modifier.pointerInput(Unit) { detectHorizontalDragGestures(onHorizontalDrag = { c, d -> offsetX += d; c.consume() }, onDragEnd = { if (offsetX < -250f) onDelete(); scope.launch { animate(0f, offsetX) { v, _ -> offsetX = v } } }) }.offset { IntOffset(offsetX.roundToInt(), 0) }) { content() }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun PlantItemElite(
-    planta: Planta,
-    onRegar: () -> Unit,
-    onEdit: () -> Unit,
-    onShowHistory: () -> Unit
-) {
-    val progresoRiego = planta.obtenerProgresoRiego()
-    val tiempoRestante = planta.obtenerTiempoRestanteFormateado()
-
-    val colorBarra = when {
-        progresoRiego < 0.20f -> DangerRed
-        progresoRiego < 0.50f -> WarningOrange
-        else -> PlantPrimary
-    }
-
-    val cardColor = if (planta.estaEnferma()) SicklyYellow.copy(alpha = 0.1f) else Color.White
-    val borderColor = when {
-        planta.esCritica() -> DangerRed.copy(alpha = 0.8f)
-        planta.estaEnferma() -> SicklyYellow.copy(alpha = 0.6f)
-        else -> Color.White.copy(alpha = 0.8f)
-    }
-
-    Surface(
-        modifier = Modifier.shadow(18.dp, RoundedCornerShape(32.dp), spotColor = PlantDark),
-        shape = RoundedCornerShape(32.dp),
-        color = cardColor,
-        border = BorderStroke(2.dp, borderColor)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .combinedClickable(
-                    onClick = onShowHistory,
-                    onLongClick = onEdit
-                )
-                .padding(20.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            AsyncImage(
-                model = planta.imagenUri ?: R.drawable.ic_launcher_background,
-                contentDescription = null,
-                modifier = Modifier
-                    .size(80.dp)
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(PlantLight),
-                contentScale = ContentScale.Crop
-            )
-
-            Spacer(modifier = Modifier.width(18.dp))
-
+fun PlantItemElite(planta: Planta, onRegar: () -> Unit, onEdit: () -> Unit, onShowHistory: () -> Unit) {
+    val progreso = planta.obtenerProgresoRiego()
+    val colorBarra = if (progreso < 0.2f) DangerRed else if (progreso < 0.5f) WarningOrange else PlantPrimary
+    Surface(modifier = Modifier.shadow(18.dp, RoundedCornerShape(32.dp)), shape = RoundedCornerShape(32.dp), color = Color.White) {
+        Row(modifier = Modifier.fillMaxWidth().combinedClickable(onClick = onShowHistory, onLongClick = onEdit).padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
+            AsyncImage(model = planta.imagenUri ?: R.drawable.ic_launcher_background, contentDescription = null, modifier = Modifier.size(80.dp).clip(RoundedCornerShape(24.dp)).background(PlantLight), contentScale = ContentScale.Crop)
+            Spacer(Modifier.width(18.dp))
             Column(Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (planta.estaEnferma()) {
-                        Icon(
-                            Icons.Rounded.SentimentVeryDissatisfied,
-                            contentDescription = "Planta Enferma",
-                            tint = WarningOrange,
-                            modifier = Modifier.size(18.dp).padding(end = 4.dp)
-                        )
-                    }
-                    Text(planta.nombre, style = TextStyle(fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, color = PlantDark))
-                }
-                Text(planta.especie, style = TextStyle(fontWeight = FontWeight.Medium, fontSize = 13.sp, color = DeepGray))
-                Spacer(modifier = Modifier.height(10.dp))
-                LinearProgressIndicator(
-                    progress = { progresoRiego },
-                    modifier = Modifier.fillMaxWidth().height(8.dp).clip(CircleShape),
-                    color = colorBarra,
-                    trackColor = colorBarra.copy(alpha = 0.2f)
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(tiempoRestante, style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 12.sp, color = colorBarra.copy(alpha = 0.8f)))
+                Text(planta.nombre, style = TextStyle(fontWeight = FontWeight.Black, fontSize = 20.sp, color = PlantDark))
+                Text(planta.especie, fontSize = 13.sp, color = Color.Gray)
+                Spacer(Modifier.height(10.dp))
+                LinearProgressIndicator(progress = { progreso }, modifier = Modifier.fillMaxWidth().height(8.dp).clip(CircleShape), color = colorBarra, trackColor = colorBarra.copy(0.2f))
             }
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            IconButton(
-                onClick = onRegar,
-                modifier = Modifier
-                    .size(52.dp)
-                    .clip(CircleShape)
-                    .background(PlantPrimary.copy(alpha = 0.1f))
-            ) {
-                Icon(Icons.Rounded.WaterDrop, contentDescription = "Regar", tint = PlantPrimary, modifier = Modifier.size(28.dp))
+            IconButton(onClick = onRegar, modifier = Modifier.size(52.dp).clip(CircleShape).background(PlantPrimary.copy(0.1f))) {
+                Icon(Icons.Rounded.WaterDrop, null, tint = PlantPrimary, modifier = Modifier.size(28.dp))
             }
         }
     }
-}
-
-// -- START: SPEED DIAL FAB IMPLEMENTATION --
-
-enum class SpeedDialState {
-    EXPANDED,
-    COLLAPSED
 }
 
 @Composable
-fun SpeedDialFAB(
-    onAddManually: () -> Unit,
-    onScanWithCamera: () -> Unit
-) {
-    var currentState by remember { mutableStateOf(SpeedDialState.COLLAPSED) }
-    val transition = updateTransition(targetState = currentState, label = "fab_transition")
-
-    val rotation by transition.animateFloat(label = "fab_rotation") { state ->
-        if (state == SpeedDialState.EXPANDED) 45f else 0f
-    }
-
-    val items = listOf(
-        SpeedDialItem("Escanear", Icons.Rounded.Camera, onScanWithCamera),
-        SpeedDialItem("Añadir", Icons.Rounded.Edit, onAddManually)
-    )
-
+fun SpeedDialFAB(onAddManually: () -> Unit, onScanWithCamera: () -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    val rotation by animateFloatAsState(if (expanded) 45f else 0f)
     Column(horizontalAlignment = Alignment.End) {
-        AnimatedVisibility(
-            visible = currentState == SpeedDialState.EXPANDED,
-            enter = fadeIn() + slideInVertically { it / 2 },
-            exit = fadeOut() + slideOutVertically { it / 2 }
-        ) {
-            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                items.forEach { item ->
-                    SpeedDialActionButton(item)
-                }
-            }
+        if (expanded) {
+            SpeedDialActionButton(SpeedDialItem("Escanear", Icons.Rounded.Camera, onScanWithCamera))
+            Spacer(Modifier.height(12.dp))
+            SpeedDialActionButton(SpeedDialItem("Añadir", Icons.Rounded.Edit, onAddManually))
+            Spacer(Modifier.height(12.dp))
         }
-
-        Spacer(Modifier.height(16.dp))
-
-        FloatingActionButton(
-            onClick = {
-                currentState = if (currentState == SpeedDialState.EXPANDED) {
-                    SpeedDialState.COLLAPSED
-                } else {
-                    SpeedDialState.EXPANDED
-                }
-            },
-            shape = CircleShape,
-            containerColor = PlantDark,
-            contentColor = Color.White,
-            elevation = FloatingActionButtonDefaults.elevation(8.dp),
-            modifier = Modifier.size(64.dp)
-        ) {
-            Icon(
-                Icons.Default.Add,
-                contentDescription = "Añadir Planta",
-                modifier = Modifier.rotate(rotation).size(32.dp)
-            )
+        FloatingActionButton(onClick = { expanded = !expanded }, shape = CircleShape, containerColor = PlantDark, contentColor = Color.White) {
+            Icon(Icons.Default.Add, null, modifier = Modifier.rotate(rotation))
         }
     }
 }
 
 @Composable
 fun SpeedDialActionButton(item: SpeedDialItem) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Surface(
-            shape = RoundedCornerShape(8.dp),
-            color = Color.Black.copy(alpha = 0.6f),
-            tonalElevation = 4.dp
-        ) {
-            Text(
-                item.label,
-                style = TextStyle(color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp),
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-            )
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Surface(shape = RoundedCornerShape(8.dp), color = Color.Black.copy(0.6f)) { Text(item.label, color = Color.White, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), fontSize = 12.sp) }
+        FloatingActionButton(onClick = item.onClick, shape = CircleShape, containerColor = PlantAccent, modifier = Modifier.size(48.dp)) { Icon(item.icon, null, tint = PlantDark) }
+    }
+}
+
+data class SpeedDialItem(val label: String, val icon: ImageVector, val onClick: () -> Unit)
+
+@Composable
+fun LightMeterDialog(targetLight: String, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val sensorManager = remember { context.getSystemService(Context.SENSOR_SERVICE) as SensorManager }
+    val lightSensor = remember { sensorManager.getDefaultSensor(Sensor.TYPE_LIGHT) }
+    var luxValue by remember { mutableFloatStateOf(0f) }
+
+    DisposableEffect(Unit) {
+        val listener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent?) {
+                event?.values?.get(0)?.let { luxValue = it }
+            }
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
         }
-        FloatingActionButton(
-            onClick = item.onClick,
-            shape = CircleShape,
-            containerColor = PlantAccent,
-            contentColor = PlantDark,
-            elevation = FloatingActionButtonDefaults.elevation(4.dp),
-            modifier = Modifier.size(48.dp)
+        sensorManager.registerListener(listener, lightSensor, SensorManager.SENSOR_DELAY_UI)
+        onDispose {
+            sensorManager.unregisterListener(listener)
+        }
+    }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            modifier = Modifier.fillMaxWidth().padding(16.dp)
         ) {
-            Icon(item.icon, contentDescription = item.label)
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(Icons.Rounded.LightMode, null, tint = WarningOrange, modifier = Modifier.size(48.dp))
+                Spacer(Modifier.height(16.dp))
+                Text("Luxómetro Real", fontWeight = FontWeight.Black, fontSize = 20.sp, color = PlantDark)
+                Text("Mide la luz en la ubicación de tu maceta", fontSize = 12.sp, color = Color.Gray, textAlign = TextAlign.Center)
+                
+                Spacer(Modifier.height(32.dp))
+                
+                Box(
+                    modifier = Modifier.size(130.dp).clip(CircleShape).background(PlantLight.copy(0.4f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(luxValue.toInt().toString(), fontSize = 36.sp, fontWeight = FontWeight.Black, color = PlantDark)
+                        Text("LUX", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = PlantPrimary)
+                    }
+                }
+                
+                Spacer(Modifier.height(32.dp))
+                
+                val (recomendacion, color) = evaluarLuz(luxValue, targetLight)
+                Surface(
+                    color = color.copy(0.1f),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        recomendacion,
+                        modifier = Modifier.padding(12.dp),
+                        style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 13.sp, color = color, textAlign = TextAlign.Center)
+                    )
+                }
+                
+                Spacer(Modifier.height(24.dp))
+                
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth().height(54.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = PlantDark)
+                ) {
+                    Text("ENTENDIDO", fontWeight = FontWeight.Black)
+                }
+            }
         }
     }
 }
 
-data class SpeedDialItem(
-    val label: String,
-    val icon: ImageVector,
-    val onClick: () -> Unit
-)
-
-// -- END: SPEED DIAL FAB IMPLEMENTATION --
+fun evaluarLuz(lux: Float, target: String): Pair<String, Color> {
+    return when {
+        target.contains("Directa", true) -> {
+            if (lux > 10000) "¡Perfecto! Luz solar directa ideal para tu planta." to PlantPrimary
+            else "Poca luz. Necesita sol directo (>10,000 lux)." to DangerRed
+        }
+        target.contains("Indirecta", true) -> {
+            if (lux in 2500f..10000f) "¡Ideal! Luz brillante indirecta detectada." to PlantPrimary
+            else if (lux > 10000) "¡Cuidado! Demasiado sol, las hojas podrían quemarse." to WarningOrange
+            else "Luz insuficiente para esta especie." to DangerRed
+        }
+        else -> { // Sombra / Baja
+            if (lux in 500f..2500f) "¡Perfecto! Sombra luminosa detectada." to PlantPrimary
+            else if (lux > 2500) "Demasiada luz para esta planta." to WarningOrange
+            else "Demasiada oscuridad para su crecimiento." to DangerRed
+        }
+    }
+}
