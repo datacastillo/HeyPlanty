@@ -41,17 +41,17 @@ import com.jucar.heyplanty.domain.Planta
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-// --- COLORES PREMIUM ---
+// --- PALETA ELITE ---
 private val PlantDark = Color(0xFF1B5E20)
 private val PlantPrimary = Color(0xFF4CAF50)
 private val PlantLight = Color(0xFFF1F8E9)
 private val SoftWhite = Color(0xFFFAFAFA)
 
-// --- CATÁLOGO DE ÉLITE ---
+// --- CATÁLOGO MAESTRO ---
 data class EspecieSugerida(val nombre: String, val icon: String, val d: Int, val h: Int, val m: Int, val luz: String, val suelo: String)
 val CATALOGO_MASTER = listOf(
     EspecieSugerida("Monstera Deliciosa", "🌿", 7, 0, 0, "Luz Indirecta", "Universal Premium"),
-    EspecieSugerida("Sansevieria", "🐍", 14, 0, 0, "Sombra", "Sustrato Cactus"),
+    EspecieSugerida("Sansevieria", "🐍", 14, 0, 0, "Luz Baja", "Sustrato Cactus"),
     EspecieSugerida("Ficus Lyrata", "🌳", 5, 0, 0, "Luz Brillante", "Drenante"),
     EspecieSugerida("Pothos N-Joy", "🍃", 7, 0, 0, "Luz Indirecta", "Universal"),
     EspecieSugerida("Aloe Vera", "🌱", 10, 0, 0, "Luz Directa", "Arenoso"),
@@ -191,7 +191,7 @@ fun IdentitySection(
 
         Spacer(Modifier.height(32.dp))
 
-        // --- CAMPO NOMBRE CON CARRUSEL MEJORADO ---
+        // --- CAMPO NOMBRE CON CARRUSEL QUE APARECE ANTES DE OPRIMIR ---
         var isNameFocused by remember { mutableStateOf(false) }
         val suggestedNames = listOf("Confi", "Verdiz", "Esperanza", "Bebé", "Clorofila", "Jade")
         var nIdx by remember { mutableIntStateOf(0) }
@@ -204,19 +204,29 @@ fun IdentitySection(
         OutlinedTextField(
             value = nombre, onValueChange = onNombreChange,
             modifier = Modifier.fillMaxWidth().onFocusChanged { isNameFocused = it.isFocused },
-            label = { Text("Nombre") },
-            placeholder = {
-                AnimatedContent(targetState = nIdx, transitionSpec = { slideInVertically { it } + fadeIn() togetherWith slideOutVertically { -it } + fadeOut() }, label = "NameCarousel") { i ->
-                    Text(suggestedNames[i], color = Color.Gray.copy(0.4f))
+            label = {
+                if (!isNameFocused && nombre.text.isEmpty()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Nombre (ej: ")
+                        AnimatedContent(
+                            targetState = suggestedNames[nIdx],
+                            transitionSpec = { (slideInVertically { h -> h } + fadeIn()).togetherWith(slideOutVertically { h -> -h } + fadeOut()) },
+                            label = "NameCarousel"
+                        ) { name -> Text(name, color = PlantPrimary.copy(alpha = 0.8f), fontWeight = FontWeight.Bold) }
+                        Text(")")
+                    }
+                } else {
+                    Text("Nombre")
                 }
             },
             shape = RoundedCornerShape(16.dp),
-            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PlantPrimary, focusedLabelColor = PlantPrimary)
+            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PlantPrimary, focusedLabelColor = PlantPrimary),
+            singleLine = true
         )
 
         Spacer(Modifier.height(28.dp))
 
-        // --- SELECCIÓN DE PLANTA (ÉLITE) ---
+        // --- SELECCIÓN DE PLANTA (ÉLITE CON FORMATO MEJORADO) ---
         Text("¿Qué planta es?", style = TextStyle(fontWeight = FontWeight.Black, fontSize = 20.sp, color = PlantDark), modifier = Modifier.align(Alignment.Start))
         Spacer(Modifier.height(12.dp))
         
@@ -231,25 +241,27 @@ fun IdentitySection(
         
         Spacer(Modifier.height(16.dp))
         
-        // Tarjetas de Opciones Precargadas
+        // Tarjetas Visuales de Sugerencias (Formato Élite)
         Column(modifier = Modifier.fillMaxWidth()) {
             Text("Sugerencias populares", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(10.dp))
             @OptIn(ExperimentalLayoutApi::class)
-            FlowRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            FlowRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 CATALOGO_MASTER.forEach { item ->
                     val isSelected = especie == item.nombre
                     Surface(
                         onClick = { onEspecieChange(item.nombre) },
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(16.dp),
                         color = if (isSelected) PlantPrimary else Color.White,
-                        border = BorderStroke(1.dp, if (isSelected) PlantPrimary else Color.LightGray.copy(0.5f)),
-                        modifier = Modifier.animateContentSize().shadow(if (isSelected) 8.dp else 2.dp, RoundedCornerShape(12.dp))
+                        border = BorderStroke(1.dp, if (isSelected) PlantPrimary else Color.LightGray.copy(0.4f)),
+                        modifier = Modifier
+                            .animateContentSize()
+                            .shadow(if (isSelected) 12.dp else 4.dp, RoundedCornerShape(16.dp))
                     ) {
-                        Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(item.icon, fontSize = 16.sp)
-                            Spacer(Modifier.width(8.dp))
-                            Text(item.nombre, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (isSelected) Color.White else PlantDark)
+                        Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(item.icon, fontSize = 20.sp)
+                            Spacer(Modifier.width(12.dp))
+                            Text(item.nombre, fontSize = 14.sp, fontWeight = FontWeight.Black, color = if (isSelected) Color.White else PlantDark)
                         }
                     }
                 }
