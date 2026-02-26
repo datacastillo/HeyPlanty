@@ -188,8 +188,8 @@ fun HomeScreen(navController: NavController, viewModel: PlantaViewModel = viewMo
         if (showDialog) {
             AddPlantDialog(
                 onDismiss = { showDialog = false },
-                onPlantAdded = { n, e, t, s, uri, color ->
-                    viewModel.agregarPlanta(n, e, t, uri, "")
+                onPlantAdded = { nombre, especie, minutos, imagenUri, tipoLuz, tipoSuelo, notas ->
+                    viewModel.agregarPlanta(nombre, especie, minutos, imagenUri, tipoLuz, tipoSuelo, notas)
                     showDialog = false
                 }
             )
@@ -199,8 +199,8 @@ fun HomeScreen(navController: NavController, viewModel: PlantaViewModel = viewMo
             AddPlantDialog(
                 plantaAEditar = plantaAEditar,
                 onDismiss = { plantaAEditar = null },
-                onPlantAdded = { n, e, t, s, uri, color ->
-                    viewModel.editarPlanta(plantaAEditar!!, n, e, t, uri)
+                onPlantAdded = { nombre, especie, minutos, imagenUri, tipoLuz, tipoSuelo, notas ->
+                    viewModel.editarPlanta(plantaAEditar!!, nombre, especie, minutos, imagenUri, tipoLuz, tipoSuelo, notas)
                     plantaAEditar = null
                 }
             )

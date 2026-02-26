@@ -115,17 +115,19 @@ class PlantaViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun agregarPlanta(nombre: String, especie: String, totalMinutos: Int, rutaImagen: String?, consejo: String) {
+    fun agregarPlanta(nombre: String, especie: String, totalMinutos: Int, rutaImagen: String?, tipoDeLuz: String, tipoDeSuelo: String, notas: String) {
         viewModelScope.launch {
             try {
                 val nueva = Planta(
                     nombre = nombre,
                     especie = especie,
-                    consejo = consejo,
                     minutosEntreRiegos = if (totalMinutos <= 0) 1 else totalMinutos,
                     fechaUltimoRiego = 0L,
                     imagenUri = rutaImagen,
-                    salud = 100
+                    salud = 100,
+                    tipoDeLuz = tipoDeLuz,
+                    tipoDeSuelo = tipoDeSuelo,
+                    notas = notas
                 )
                 plantaDao.insertPlanta(nueva)
             } catch (e: Exception) {
@@ -134,14 +136,17 @@ class PlantaViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun editarPlanta(plantaOriginal: Planta, nuevoNombre: String, nuevaEspecie: String, nuevosMinutos: Int, nuevaImagen: String?) {
+    fun editarPlanta(plantaOriginal: Planta, nuevoNombre: String, nuevaEspecie: String, nuevosMinutos: Int, nuevaImagen: String?, nuevoTipoDeLuz: String, nuevoTipoDeSuelo: String, nuevasNotas: String) {
         viewModelScope.launch {
             try {
                 val plantaActualizada = plantaOriginal.copy(
                     nombre = nuevoNombre,
                     especie = nuevaEspecie,
                     minutosEntreRiegos = nuevosMinutos,
-                    imagenUri = nuevaImagen
+                    imagenUri = nuevaImagen,
+                    tipoDeLuz = nuevoTipoDeLuz,
+                    tipoDeSuelo = nuevoTipoDeSuelo,
+                    notas = nuevasNotas
                 )
                 plantaDao.insertPlanta(plantaActualizada)
                 programarNotificacion(plantaActualizada)
